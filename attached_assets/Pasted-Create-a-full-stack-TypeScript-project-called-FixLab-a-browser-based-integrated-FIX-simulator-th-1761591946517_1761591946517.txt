@@ -1,0 +1,139 @@
+Create a full-stack TypeScript project called “FixLab” — a browser-based integrated FIX simulator that replicates both FIXSimulator (trader) and Banzai (broker) behavior with complete allocation workflows.
+
+=== PROJECT SUMMARY ===
+FixLab lets users open two browser tabs:
+• Tab A → Trader (FIX Simulator)
+• Tab B → Broker (Banzai-style)
+Both connect to a shared Session Manager.  
+Users choose role and session after a login/lander screen.  
+Supports Initiator/Acceptor toggle, full message flow simulation, and post-trade allocation processing — all in Replit.
+
+=== TECH STACK ===
+Frontend: React + TypeScript + Tailwind + Vite  
+Backend: Node + TypeScript + Fastify + socket.io (WebSocket)  
+DB: SQLite via Prisma (or JSON fallback)  
+Tests: Jest + Playwright  
+Build: npm run dev starts client+server on Replit.
+
+=== CORE FIX FLOW SUPPORT ===
+• New Order Single (35=D)  
+• Execution Report (35=8) – New, Partial Fill, Fill, Cancel, Reject  
+• Cancel/Replace (35=F / G)  
+• Allocation Instruction (35=J) → Allocation Report (35=AS) → Confirm/Ack  
+• Confirm (35=AK), Allocation Ack (35=P)  
+• Support 4 allocation styles:
+   – Pro-rata by order qty  
+   – Percent-based  
+   – Fixed Qty / Amount  
+   – Average Price (AP) roll-up of multi-fill blocks  
+• Three-way match simulation: Trader ↔ Broker ↔ Custodian (confirm chain)  
+• Optional latency injection & reject simulation  
+• Message replay/export/import (JSON or CSV)  
+
+=== BACKEND MODULES ===
+src/server/
+  • index.ts – Fastify + socket.io init  
+  • fixAdapter.ts – IFixAdapter interface (start, stop, send, onMessage, injectLatency, simulateReject)  
+  • inProcessAdapter.ts – default adapter (in-memory routing)  
+  • tcpBridgeAdapter.ts – stub for real QuickFIX/TCP bridge  
+  • sessions.ts – manages named sessions + participant registry  
+  • allocationEngine.ts – allocation calculations, report builder  
+  • validation.ts – simple FIX tag validation  
+
+Shared types (src/shared/types.ts): Order, Execution, Allocation, Session, FIXMessage.
+
+=== FRONTEND MODULES ===
+src/client/
+  • pages/
+     – Lander + Auth (mock username login)
+     – Role Chooser (Trader / Broker / Custodian)
+     – TraderDashboard
+     – BrokerDashboard
+     – AllocationDesk
+  • components/
+     – MessageTimeline (color-coded incoming/outgoing)
+     – OrderEntryForm, OrderBook, ExecutionLog
+     – AllocationPanel (account splits, sliders, percent/qty)
+     – SessionControlBar (role, latency toggle, connect status)
+  • wsClient.ts – socket.io wrapper  
+  • styles: Tailwind config with soft grid layout, rounded cards, toasts.
+
+=== API + WS EVENTS ===
+REST:
+  GET /api/sessions  
+  POST /api/sessions  
+  GET /api/sessions/:id/messages  
+  POST /api/sessions/:id/replay  
+WebSocket namespace /ws:
+  • join {sessionId, role, user}
+  • outgoing.fix – client→server  
+  • incoming.fix – server→client  
+  • allocation.instruction / allocation.report / allocation.confirm  
+  • control.latency, control.reject, session.update  
+
+=== ALLOCATION DATA MODEL ===
+AllocationInstruction:
+  AllocID (70), AllocTransType (71), NoAllocs (78), AllocAccount (79), AllocQty (80), AvgPx (6), NetMoney (118), TradeDate (75)
+AllocationReport:
+  AllocReportID (755), AllocStatus (87), AvgPx (6), CumQty (14)
+Confirm:
+  ConfirmID (664), ConfirmTransType (666), ConfirmType (773), ConfirmStatus (665)
+All persisted to SQLite table allocations (AllocID, SessionID, AllocType, Accounts[], Status, CreatedAt).
+
+=== SAMPLE FIX FLOWS ===
+1. Trader → NewOrderSingle (11, 55, 54, 38, 40, 60)  
+2. Broker → ExecutionReport (New)  
+3. Broker → ExecutionReport (Fill)  
+4. Trader → AllocationInstruction (AllocID=A1, AllocType=Pro-rata, NoAllocs=2)  
+5. Broker → AllocationReport (AllocStatus=Accepted)  
+6. Custodian → Confirm (ConfirmStatus=Affirmed)  
+
+=== UI / UX ===
+• Trader: order entry, live executions, allocation wizard  
+• Broker: execution blotter, incoming allocations, auto-accept/reject rules  
+• Custodian (optional third role): confirm allocations  
+• Allocation wizard: dynamically add accounts, choose method (pro-rata, percent, manual), show computed values live.  
+• Real-time message timeline with FIX raw text + parsed JSON view.  
+• Replay viewer for saved sessions.  
+• CSV batch upload for block orders and allocations.
+
+=== TESTS / QA (Playwright) ===
+1. End-to-end: Trader places block order → Broker fills → Trader allocates → Broker accepts → Custodian confirms.  
+2. Partial fill allocation: multiple ExecutionReports merged, average price allocation check.  
+3. Reject allocation: Broker sends reject; Trader retry flow validated.  
+4. Latency injection 500 ms → measured round-trip ≥ 500 ms.  
+5. Cancel/replace sequence validated.  
+6. Multi-account percent allocation totaling 100 %.  
+
+=== ENV (.env.example) ===
+PORT=3000  
+NODE_ENV=development  
+SQLITE_FILE=./data/fixlab.db  
+MAX_MESSAGES=10000  
+
+=== SCRIPTS (package.json) ===
+"scripts": {
+  "dev": "ts-node-dev --respawn src/server/index.ts",
+  "client:dev": "vite",
+  "build": "tsc && vite build",
+  "start": "node dist/server/index.js",
+  "test": "jest",
+  "qa": "playwright test"
+}
+
+=== DELIVERABLES ===
+• Working Replit app with two-tab simulation (Trader/Broker)  
+• Full allocation engine (manual + auto methods)  
+• Allocation Instruction ↔ Report ↔ Confirm flow working end-to-end  
+• Message inspector, logs, replay, export/import  
+• README.md with run instructions, FIX tag reference, and QA checklist  
+
+=== QUICKSTART (auto-generate in README) ===
+1. npm install  
+2. cp .env.example .env  
+3. npm run dev  
+4. Open two browser tabs → login as Trader / Broker → join same session → place order → fill → allocate → confirm.  
+
+=== OBJECTIVE ===
+Deliver a Replit-runnable full-stack FIX simulation + allocation lab covering every major workflow (order, execution, cancel, reject, allocation, confirmation) using only in-memory adapters by default, extensible to external FIX via TcpBridgeAdapter.  
+Focus on correctness, interactivity, and completeness of the allocation lifecycle.
