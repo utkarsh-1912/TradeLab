@@ -364,6 +364,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        // Handle order cancel request
+        if (message.type === 'order.cancel' && client) {
+          const { orderId } = message.data;
+          const order = await storage.getOrder(orderId);
+          
+          if (!order) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Order not found' }));
+            return;
+          }
+
+          // Update order status to PendingCancel
+          await storage.updateOrderStatus(orderId, "PendingCancel", order.cumQty, order.avgPx);
+
+          const newClOrdId = `CXLREQ-${Date.now()}-${randomUUID().slice(0, 8)}`;
+
+          // Create FIX Cancel Request message
+          const fixTags = {
+            "11": newClOrdId,
+            "41": order.clOrdId,
+            "55": order.symbol,
+            "54": order.side === "Buy" ? "1" : "2",
+            "60": new Date().toISOString(),
+          };
+
+          const rawFix = tagsToFIXString("F", fixTags);
+
+          await storage.createMessage({
+            sessionId: client.sessionId,
+            direction: "Outgoing",
+            messageType: "F",
+            rawFix,
+            parsed: fixTags,
+            fromRole: client.role,
+            toRole: "Broker",
+          });
+
+          broadcast(client.sessionId, {
+            type: 'order.cancel.pending',
+            data: await storage.getOrder(orderId)
+          });
+
+          broadcast(client.sessionId, {
+            type: 'message.new',
+            data: { direction: "Incoming", messageType: "F", rawFix, parsed: fixTags, fromRole: client.role }
+          });
+        }
+
+        // Handle cancel accept (broker accepts cancel)
+        if (message.type === 'order.cancel.accept' && client) {
+          const { orderId } = message.data;
+          const order = await storage.getOrder(orderId);
+          
+          if (!order) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Order not found' }));
+            return;
+          }
+
+          const execId = `EXEC-${Date.now()}-${randomUUID().slice(0, 8)}`;
+
+          const execution = await storage.createExecution({
+            execId,
+            orderId: order.id,
+            sessionId: client.sessionId,
+            execType: "Canceled",
+            orderStatus: "Canceled",
+            symbol: order.symbol,
+            side: order.side,
+            lastQty: 0,
+            lastPx: 0,
+            cumQty: order.cumQty,
+            avgPx: order.avgPx || 0,
+            leavesQty: 0,
+            createdBy: client.role,
+          });
+
+          await storage.updateOrderStatus(orderId, "Canceled", order.cumQty, order.avgPx);
+
+          const fixTags = {
+            "11": order.clOrdId,
+            "17": execId,
+            "150": "4",  // ExecType: Canceled
+            "39": "4",   // OrdStatus: Canceled
+            "55": order.symbol,
+            "54": order.side === "Buy" ? "1" : "2",
+            "32": "0",
+            "31": "0",
+            "151": "0",
+            "14": order.cumQty.toString(),
+            "6": (order.avgPx || 0).toString(),
+          };
+
+          const rawFix = tagsToFIXString("8", fixTags);
+
+          await storage.createMessage({
+            sessionId: client.sessionId,
+            direction: "Outgoing",
+            messageType: "8",
+            rawFix,
+            parsed: fixTags,
+            fromRole: client.role,
+            toRole: "Trader",
+          });
+
+          broadcast(client.sessionId, {
+            type: 'execution.created',
+            data: execution
+          });
+
+          broadcast(client.sessionId, {
+            type: 'order.updated',
+            data: await storage.getOrder(orderId)
+          });
+
+          broadcast(client.sessionId, {
+            type: 'message.new',
+            data: { direction: "Incoming", messageType: "8", rawFix, parsed: fixTags, fromRole: client.role }
+          });
+        }
+
+        // Handle order replace request
+        if (message.type === 'order.replace' && client) {
+          const { orderId, quantity, price } = message.data;
+          const order = await storage.getOrder(orderId);
+          
+          if (!order) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Order not found' }));
+            return;
+          }
+
+          // Update order status to PendingReplace
+          await storage.updateOrderStatus(orderId, "PendingReplace", order.cumQty, order.avgPx);
+
+          const newClOrdId = `RPLREQ-${Date.now()}-${randomUUID().slice(0, 8)}`;
+
+          // Create FIX Replace Request message
+          const fixTags = {
+            "11": newClOrdId,
+            "41": order.clOrdId,
+            "55": order.symbol,
+            "54": order.side === "Buy" ? "1" : "2",
+            "38": quantity.toString(),
+            "40": order.orderType === "Market" ? "1" : order.orderType === "Limit" ? "2" : "3",
+            "60": new Date().toISOString(),
+          };
+
+          if (price !== undefined) {
+            fixTags["44"] = price.toString();
+          }
+
+          const rawFix = tagsToFIXString("G", fixTags);
+
+          await storage.createMessage({
+            sessionId: client.sessionId,
+            direction: "Outgoing",
+            messageType: "G",
+            rawFix,
+            parsed: fixTags,
+            fromRole: client.role,
+            toRole: "Broker",
+          });
+
+          broadcast(client.sessionId, {
+            type: 'order.replace.pending',
+            data: { order: await storage.getOrder(orderId), newQuantity: quantity, newPrice: price }
+          });
+
+          broadcast(client.sessionId, {
+            type: 'message.new',
+            data: { direction: "Incoming", messageType: "G", rawFix, parsed: fixTags, fromRole: client.role }
+          });
+        }
+
+        // Handle replace accept (broker accepts replace)
+        if (message.type === 'order.replace.accept' && client) {
+          const { orderId, quantity, price } = message.data;
+          const order = await storage.getOrder(orderId);
+          
+          if (!order) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Order not found' }));
+            return;
+          }
+
+          // Update order details
+          await storage.updateOrderDetails(orderId, quantity, price);
+          await storage.updateOrderStatus(orderId, "New", order.cumQty, order.avgPx);
+
+          const execId = `EXEC-${Date.now()}-${randomUUID().slice(0, 8)}`;
+
+          const execution = await storage.createExecution({
+            execId,
+            orderId: order.id,
+            sessionId: client.sessionId,
+            execType: "Replaced",
+            orderStatus: "New",
+            symbol: order.symbol,
+            side: order.side,
+            lastQty: 0,
+            lastPx: price || order.price || 0,
+            cumQty: order.cumQty,
+            avgPx: order.avgPx || 0,
+            leavesQty: quantity - order.cumQty,
+            createdBy: client.role,
+          });
+
+          const fixTags = {
+            "11": order.clOrdId,
+            "17": execId,
+            "150": "5",  // ExecType: Replaced
+            "39": "0",   // OrdStatus: New
+            "55": order.symbol,
+            "54": order.side === "Buy" ? "1" : "2",
+            "32": "0",
+            "31": (price || order.price || 0).toString(),
+            "151": (quantity - order.cumQty).toString(),
+            "14": order.cumQty.toString(),
+            "6": (order.avgPx || 0).toString(),
+            "38": quantity.toString(),
+          };
+
+          if (price !== undefined) {
+            fixTags["44"] = price.toString();
+          }
+
+          const rawFix = tagsToFIXString("8", fixTags);
+
+          await storage.createMessage({
+            sessionId: client.sessionId,
+            direction: "Outgoing",
+            messageType: "8",
+            rawFix,
+            parsed: fixTags,
+            fromRole: client.role,
+            toRole: "Trader",
+          });
+
+          broadcast(client.sessionId, {
+            type: 'execution.created',
+            data: execution
+          });
+
+          broadcast(client.sessionId, {
+            type: 'order.updated',
+            data: await storage.getOrder(orderId)
+          });
+
+          broadcast(client.sessionId, {
+            type: 'message.new',
+            data: { direction: "Incoming", messageType: "8", rawFix, parsed: fixTags, fromRole: client.role }
+          });
+        }
+
         // Handle allocation instruction
         if (message.type === 'allocation.instruction' && client) {
           const { orderId, allocType, accounts } = message.data;

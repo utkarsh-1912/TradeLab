@@ -272,3 +272,51 @@ export const insertAllocationSchemaValidation = z.object({
   tradeDate: z.string().min(1),
   createdBy: z.enum(["Trader", "Broker", "Custodian"]),
 });
+
+// Order Cancel Request
+export interface OrderCancelRequest {
+  origClOrdId: string;  // Tag 41 - Original Client Order ID
+  clOrdId: string;      // Tag 11 - New Client Order ID for this request
+  orderId: string;
+  sessionId: string;
+  symbol: string;       // Tag 55
+  side: OrderSide;      // Tag 54
+  createdBy: ParticipantRole;
+}
+
+export const orderCancelRequestValidation = z.object({
+  origClOrdId: z.string().min(1),
+  clOrdId: z.string().min(1),
+  orderId: z.string().min(1),
+  sessionId: z.string().min(1),
+  symbol: z.string().min(1),
+  side: z.enum(["Buy", "Sell"]),
+  createdBy: z.enum(["Trader", "Broker", "Custodian"]),
+});
+
+// Order Cancel/Replace Request
+export interface OrderReplaceRequest {
+  origClOrdId: string;  // Tag 41 - Original Client Order ID
+  clOrdId: string;      // Tag 11 - New Client Order ID for this request
+  orderId: string;
+  sessionId: string;
+  symbol: string;       // Tag 55
+  side: OrderSide;      // Tag 54
+  quantity: number;     // Tag 38 - New quantity
+  orderType: OrderType; // Tag 40
+  price?: number;       // Tag 44 - New price
+  createdBy: ParticipantRole;
+}
+
+export const orderReplaceRequestValidation = z.object({
+  origClOrdId: z.string().min(1),
+  clOrdId: z.string().min(1),
+  orderId: z.string().min(1),
+  sessionId: z.string().min(1),
+  symbol: z.string().min(1),
+  side: z.enum(["Buy", "Sell"]),
+  quantity: z.number().positive(),
+  orderType: z.enum(["Market", "Limit", "Stop", "StopLimit"]),
+  price: z.number().positive().optional(),
+  createdBy: z.enum(["Trader", "Broker", "Custodian"]),
+});

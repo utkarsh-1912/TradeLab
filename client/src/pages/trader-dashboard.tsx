@@ -9,6 +9,7 @@ import { OrderBook } from "@/components/order-book";
 import { ExecutionLog } from "@/components/execution-log";
 import { MessageTimeline } from "@/components/message-timeline";
 import { AllocationWizard } from "@/components/allocation-wizard";
+import { ReplaceOrderDialog } from "@/components/replace-order-dialog";
 import { LogOut, PieChart } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import type { Order, Execution, FIXMessage, AllocationType, AllocationAccount } from "@shared/schema";
@@ -24,6 +25,8 @@ export default function TraderDashboard() {
   const [messages, setMessages] = useState<FIXMessage[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [allocationWizardOpen, setAllocationWizardOpen] = useState(false);
+  const [replaceDialogOpen, setReplaceDialogOpen] = useState(false);
+  const [orderToReplace, setOrderToReplace] = useState<Order | null>(null);
 
   const username = localStorage.getItem("fixlab_username") || "Trader";
   const sessionId = localStorage.getItem("fixlab_session_id") || "";
@@ -58,6 +61,26 @@ export default function TraderDashboard() {
       setOrders((prev) =>
         prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
       );
+    });
+
+    wsClient.on("order.cancel.pending", (updatedOrder: Order) => {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+      );
+      toast({
+        title: "Cancel Request Sent",
+        description: "Waiting for broker confirmation",
+      });
+    });
+
+    wsClient.on("order.replace.pending", (data: any) => {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === data.order.id ? data.order : o))
+      );
+      toast({
+        title: "Replace Request Sent",
+        description: `New Qty: ${data.newQuantity}${data.newPrice ? `, Price: $${data.newPrice}` : ""}`,
+      });
     });
 
     wsClient.on("execution.created", (execution: Execution) => {
@@ -113,16 +136,24 @@ export default function TraderDashboard() {
   };
 
   const handleCancelOrder = (orderId: string) => {
-    toast({
-      title: "Cancel Not Implemented",
-      description: "Cancel functionality coming soon",
+    wsClient.send({
+      type: "order.cancel",
+      data: { orderId },
     });
   };
 
   const handleReplaceOrder = (orderId: string) => {
-    toast({
-      title: "Replace Not Implemented",
-      description: "Replace functionality coming soon",
+    const order = orders.find((o) => o.id === orderId);
+    if (order) {
+      setOrderToReplace(order);
+      setReplaceDialogOpen(true);
+    }
+  };
+
+  const handleReplaceSubmit = (orderId: string, quantity: number, price?: number) => {
+    wsClient.send({
+      type: "order.replace",
+      data: { orderId, quantity, price },
     });
   };
 
@@ -252,6 +283,14 @@ export default function TraderDashboard() {
         onClose={() => setAllocationWizardOpen(false)}
         order={selectedOrder}
         onSubmit={handleAllocationSubmit}
+      />
+
+      {/* Replace Order Dialog */}
+      <ReplaceOrderDialog
+        open={replaceDialogOpen}
+        onOpenChange={setReplaceDialogOpen}
+        order={orderToReplace}
+        onSubmit={handleReplaceSubmit}
       />
     </div>
   );

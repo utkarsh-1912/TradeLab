@@ -24,6 +24,7 @@ export default function BrokerDashboard() {
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [messages, setMessages] = useState<FIXMessage[]>([]);
   const [fillPrices, setFillPrices] = useState<Record<string, string>>({});
+  const [pendingReplaceDetails, setPendingReplaceDetails] = useState<Record<string, { quantity: number; price?: number }>>({});
 
   const username = localStorage.getItem("fixlab_username") || "Broker";
   const sessionId = localStorage.getItem("fixlab_session_id") || "";
@@ -62,6 +63,34 @@ export default function BrokerDashboard() {
       setOrders((prev) =>
         prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
       );
+    });
+
+    wsClient.on("order.cancel.pending", (updatedOrder: Order) => {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+      );
+      toast({
+        title: "Cancel Request Received",
+        description: `Order ${updatedOrder.symbol} pending cancellation`,
+      });
+    });
+
+    wsClient.on("order.replace.pending", (data: any) => {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === data.order.id ? data.order : o))
+      );
+      // Store the pending replace details
+      setPendingReplaceDetails((prev) => ({
+        ...prev,
+        [data.order.id]: {
+          quantity: data.newQuantity,
+          price: data.newPrice,
+        },
+      }));
+      toast({
+        title: "Replace Request Received",
+        description: `Order ${data.order.symbol} - New Qty: ${data.newQuantity}${data.newPrice ? `, Price: $${data.newPrice}` : ""}`,
+      });
     });
 
     wsClient.on("allocation.created", (allocation: Allocation) => {
@@ -162,6 +191,43 @@ export default function BrokerDashboard() {
     });
   };
 
+  const handleCancelAccept = (orderId: string) => {
+    wsClient.send({
+      type: "order.cancel.accept",
+      data: { orderId },
+    });
+    toast({
+      title: "Cancel Accepted",
+      description: "Order has been canceled",
+    });
+  };
+
+  const handleReplaceAccept = (orderId: string) => {
+    const replaceDetails = pendingReplaceDetails[orderId];
+    if (!replaceDetails) return;
+
+    wsClient.send({
+      type: "order.replace.accept",
+      data: { 
+        orderId, 
+        quantity: replaceDetails.quantity, 
+        price: replaceDetails.price 
+      },
+    });
+    
+    // Clear the pending replace details
+    setPendingReplaceDetails((prev) => {
+      const updated = { ...prev };
+      delete updated[orderId];
+      return updated;
+    });
+    
+    toast({
+      title: "Replace Accepted",
+      description: `Modified to ${replaceDetails.quantity}${replaceDetails.price ? ` @ $${replaceDetails.price}` : ""}`,
+    });
+  };
+
   const handleLatencyChange = (ms: number) => {
     setLatencyMs(ms);
     wsClient.updateLatency(ms);
@@ -173,6 +239,8 @@ export default function BrokerDashboard() {
   };
 
   const newOrders = orders.filter(o => o.status === "New");
+  const pendingCancelOrders = orders.filter(o => o.status === "PendingCancel");
+  const pendingReplaceOrders = orders.filter(o => o.status === "PendingReplace");
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -285,6 +353,78 @@ export default function BrokerDashboard() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Pending Cancel/Replace Requests */}
+            {(pendingCancelOrders.length > 0 || pendingReplaceOrders.length > 0) && (
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold">Pending Requests</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {pendingCancelOrders.map((order) => (
+                    <Card key={order.id} className="p-3 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-semibold">{order.symbol}</span>
+                            <Badge variant="outline" className="text-xs">Cancel Request</Badge>
+                          </div>
+                          <div className="font-mono text-xs text-muted-foreground">
+                            {order.clOrdId}
+                          </div>
+                        </div>
+                        <Button
+                          data-testid={`button-accept-cancel-${order.id}`}
+                          size="sm"
+                          className="h-8"
+                          onClick={() => handleCancelAccept(order.id)}
+                        >
+                          <Check className="h-3.5 w-3.5 mr-1" />
+                          Accept Cancel
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                  {pendingReplaceOrders.map((order) => {
+                    const replaceDetails = pendingReplaceDetails[order.id];
+                    return (
+                      <Card key={order.id} className="p-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-sm font-semibold">{order.symbol}</span>
+                                <Badge variant="outline" className="text-xs">Replace Request</Badge>
+                              </div>
+                              {replaceDetails && (
+                                <div className="font-mono text-xs">
+                                  <div className="text-muted-foreground">
+                                    Old: {order.quantity} @ {order.price ? `$${order.price.toFixed(2)}` : "MKT"}
+                                  </div>
+                                  <div className="text-blue-700 dark:text-blue-300 font-semibold">
+                                    New: {replaceDetails.quantity} @ {replaceDetails.price ? `$${replaceDetails.price.toFixed(2)}` : "MKT"}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <Button
+                              data-testid={`button-accept-replace-${order.id}`}
+                              size="sm"
+                              className="h-8"
+                              onClick={() => handleReplaceAccept(order.id)}
+                              disabled={!replaceDetails}
+                            >
+                              <Check className="h-3.5 w-3.5 mr-1" />
+                              Accept Replace
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="flex-1 overflow-hidden flex flex-col">
               <CardHeader className="pb-4">

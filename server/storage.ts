@@ -43,6 +43,7 @@ export interface IStorage {
   getOrderByClOrdId(sessionId: string, clOrdId: string): Promise<Order | undefined>;
   getOrdersBySession(sessionId: string): Promise<Order[]>;
   updateOrderStatus(id: string, status: OrderStatus, cumQty: number, avgPx?: number): Promise<void>;
+  updateOrderDetails(id: string, quantity: number, price?: number): Promise<void>;
 
   // Execution methods
   createExecution(execution: InsertExecution): Promise<Execution>;
@@ -225,6 +226,21 @@ export class MemStorage implements IStorage {
       order.leavesQty = order.quantity - cumQty;
       if (avgPx !== undefined) {
         order.avgPx = avgPx;
+      }
+    }
+  }
+
+  async updateOrderDetails(
+    id: string,
+    quantity: number,
+    price?: number
+  ): Promise<void> {
+    const order = this.orders.get(id);
+    if (order) {
+      order.quantity = quantity;
+      order.leavesQty = quantity - order.cumQty;
+      if (price !== undefined) {
+        order.price = price;
       }
     }
   }
