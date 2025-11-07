@@ -91,13 +91,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Handle join event
         if (message.type === 'join') {
-          const { sessionId, role, username } = message;
+          const { sessionId: clientSessionId, sessionName, role, username } = message;
           
-          // Get or create session
-          let session = await storage.getSession(sessionId);
+          // Get session - it should already exist from landing page
+          let session = await storage.getSession(clientSessionId);
           if (!session) {
-            session = await storage.createSession({ name: sessionId });
+            // Fallback: create session with the provided name or use sessionId
+            const name = sessionName || `Session-${clientSessionId.slice(0, 8)}`;
+            session = await storage.createSession({ name });
           }
+
+          // Use the actual session ID from the database
+          const sessionId = session.id;
 
           // Add participant
           await storage.addParticipant({

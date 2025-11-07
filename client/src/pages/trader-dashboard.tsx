@@ -39,7 +39,7 @@ export default function TraderDashboard() {
     }
 
     // Connect to WebSocket
-    wsClient.connect(sessionId, "Trader", username);
+    wsClient.connect(sessionId, "Trader", username, sessionName);
 
     // Set up event handlers
     wsClient.on("session.joined", (data) => {

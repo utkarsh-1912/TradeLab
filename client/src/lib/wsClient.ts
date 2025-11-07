@@ -30,7 +30,7 @@ export class WSClient {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
 
-  connect(sessionId: string, role: ParticipantRole, username: string) {
+  connect(sessionId: string, role: ParticipantRole, username: string, sessionName?: string) {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     
@@ -44,6 +44,7 @@ export class WSClient {
       this.send({
         type: 'join',
         sessionId,
+        sessionName,
         role,
         username,
       });
@@ -64,11 +65,11 @@ export class WSClient {
 
     this.ws.onclose = () => {
       console.log('WebSocket disconnected');
-      this.attemptReconnect(sessionId, role, username);
+      this.attemptReconnect(sessionId, role, username, sessionName);
     };
   }
 
-  private attemptReconnect(sessionId: string, role: ParticipantRole, username: string) {
+  private attemptReconnect(sessionId: string, role: ParticipantRole, username: string, sessionName?: string) {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
@@ -76,7 +77,7 @@ export class WSClient {
       console.log(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
       
       this.reconnectTimeout = setTimeout(() => {
-        this.connect(sessionId, role, username);
+        this.connect(sessionId, role, username, sessionName);
       }, delay);
     }
   }

@@ -32,7 +32,7 @@ export default function CustodianDashboard() {
     }
 
     // Connect to WebSocket
-    wsClient.connect(sessionId, "Custodian", username);
+    wsClient.connect(sessionId, "Custodian", username, sessionName);
 
     // Set up event handlers
     wsClient.on("session.joined", (data) => {

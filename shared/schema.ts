@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, real, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, real, timestamp, boolean, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -17,6 +17,94 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Sessions
+export const sessions = pgTable("sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+});
+
+// Participants
+export const participants = pgTable("participants", {
+  sessionId: varchar("session_id").notNull().references(() => sessions.id),
+  role: varchar("role", { length: 20 }).notNull(),
+  username: text("username").notNull(),
+  connected: boolean("connected").notNull().default(true),
+  latencyMs: integer("latency_ms").notNull().default(0),
+  simulateReject: boolean("simulate_reject").notNull().default(false),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.sessionId, table.role, table.username] }),
+}));
+
+// Orders
+export const orders = pgTable("orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clOrdId: text("cl_ord_id").notNull(),
+  sessionId: varchar("session_id").notNull().references(() => sessions.id),
+  symbol: text("symbol").notNull(),
+  side: varchar("side", { length: 10 }).notNull(),
+  quantity: integer("quantity").notNull(),
+  orderType: varchar("order_type", { length: 20 }).notNull(),
+  price: real("price"),
+  status: varchar("status", { length: 20 }).notNull().default("New"),
+  createdBy: varchar("created_by", { length: 20 }).notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  avgPx: real("avg_px"),
+  cumQty: integer("cum_qty").notNull().default(0),
+  leavesQty: integer("leaves_qty").notNull(),
+});
+
+// Executions
+export const executions = pgTable("executions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  execId: text("exec_id").notNull(),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
+  sessionId: varchar("session_id").notNull().references(() => sessions.id),
+  execType: varchar("exec_type", { length: 20 }).notNull(),
+  orderStatus: varchar("order_status", { length: 20 }).notNull(),
+  symbol: text("symbol").notNull(),
+  side: varchar("side", { length: 10 }).notNull(),
+  lastQty: integer("last_qty").notNull(),
+  lastPx: real("last_px").notNull(),
+  cumQty: integer("cum_qty").notNull(),
+  avgPx: real("avg_px").notNull(),
+  leavesQty: integer("leaves_qty").notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  createdBy: varchar("created_by", { length: 20 }).notNull(),
+});
+
+// Allocations
+export const allocations = pgTable("allocations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  allocId: text("alloc_id").notNull(),
+  sessionId: varchar("session_id").notNull().references(() => sessions.id),
+  orderId: varchar("order_id").notNull().references(() => orders.id),
+  allocType: varchar("alloc_type", { length: 20 }).notNull(),
+  accounts: text("accounts").notNull(), // JSON string
+  status: varchar("status", { length: 20 }).notNull().default("Pending"),
+  avgPx: real("avg_px").notNull(),
+  totalQty: integer("total_qty").notNull(),
+  symbol: text("symbol").notNull(),
+  side: varchar("side", { length: 10 }).notNull(),
+  tradeDate: text("trade_date").notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  createdBy: varchar("created_by", { length: 20 }).notNull(),
+});
+
+// FIX Messages
+export const fixMessages = pgTable("fix_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => sessions.id),
+  direction: varchar("direction", { length: 20 }).notNull(),
+  messageType: varchar("message_type", { length: 5 }).notNull(),
+  rawFix: text("raw_fix").notNull(),
+  parsed: text("parsed").notNull(), // JSON string
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  fromRole: varchar("from_role", { length: 20 }).notNull(),
+  toRole: varchar("to_role", { length: 20 }),
+});
 
 // ============ FIX PROTOCOL TYPES ============
 

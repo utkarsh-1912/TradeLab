@@ -37,7 +37,7 @@ export default function BrokerDashboard() {
     }
 
     // Connect to WebSocket
-    wsClient.connect(sessionId, "Broker", username);
+    wsClient.connect(sessionId, "Broker", username, sessionName);
 
     // Set up event handlers
     wsClient.on("session.joined", (data) => {
