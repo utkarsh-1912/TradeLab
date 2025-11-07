@@ -4,6 +4,15 @@
 
 FixLab is a browser-based integrated FIX protocol simulator that replicates financial trading workflows across three roles: Trader, Broker, and Custodian. The application enables multi-participant simulation of complete order-to-allocation workflows using WebSocket-based real-time communication. Users can open multiple browser tabs, each assuming different roles within a shared trading session, to simulate realistic financial message exchanges including order placement, execution reporting, and post-trade allocation processing.
 
+## Recent Changes
+
+### November 2025 - Modern Fintech UI & Partial Fills
+- **UI Redesign**: Migrated from Bloomberg Terminal density to modern Robinhood-style fintech aesthetic with vibrant colors (blue/purple primary, green for buy, red for sell), card-based layouts, generous whitespace, and dark mode optimization
+- **Partial Fills**: Complete implementation with quantity controls, quick-fill percentage buttons (25%, 50%, 75%, 100%), input validation preventing overfills, and enhanced execution log showing fill progression with color-coded status indicators
+- **Database Migration**: Completed PostgreSQL integration with Drizzle ORM, replacing in-memory storage with persistent database for all session data
+- **Message Export/Import**: Added JSON/CSV export functionality and JSON import capability for session messages
+- **CSV Batch Upload**: Implemented bulk order upload with CSV parsing and validation
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -14,7 +23,7 @@ Preferred communication style: Simple, everyday language.
 
 **Framework**: React with TypeScript, built using Vite for development and bundling.
 
-**UI Component System**: Radix UI primitives wrapped with shadcn/ui components following a Material Design-influenced design system with Bloomberg Terminal density patterns. The design emphasizes information density for financial data while maintaining scanability through consistent spacing (Tailwind 2/4/6/8 units) and a clear typography hierarchy using Inter for UI elements and JetBrains Mono for monospace data.
+**UI Component System**: Radix UI primitives wrapped with shadcn/ui components following a modern fintech design system (Robinhood/Coinbase aesthetic). The design features vibrant colors (blue/purple primary, green for buy, red for sell), clean card-based layouts with generous whitespace, and clear typography hierarchy using Inter for UI elements and JetBrains Mono for financial data. Optimized for dark mode with excellent contrast.
 
 **State Management**: React hooks for local component state, TanStack Query (React Query) for server state management with WebSocket integration for real-time updates. The application maintains separate state slices for orders, executions, allocations, and FIX messages.
 
@@ -39,7 +48,7 @@ Preferred communication style: Simple, everyday language.
 - **FIX Validation**: Message-type-specific tag validation ensuring required fields and value constraints
 - **Message Routing**: Role-based message distribution through WebSocket broadcast patterns
 
-**Storage Layer**: Abstracted storage interface (`IStorage`) with in-memory implementation. The architecture supports future PostgreSQL integration via Drizzle ORM (configuration present in `drizzle.config.ts`).
+**Storage Layer**: Abstracted storage interface (`IStorage`) with PostgreSQL database implementation (`DbStorage`) using Drizzle ORM. All session data (orders, executions, allocations, messages) persists to the database. Session replay capability allows rejoining sessions and loading complete historical state. Automatic schema migrations via `npm run db:push`.
 
 ### Data Models
 
@@ -47,8 +56,8 @@ Preferred communication style: Simple, everyday language.
 - **Users**: Authentication entities with username/password
 - **Sessions**: Named trading sessions with active/closed status
 - **Participants**: Role-specific session members (Trader/Broker/Custodian) with connection state and simulation parameters (latency, reject flags)
-- **Orders**: FIX order representations with status tracking (New, PartiallyFilled, Filled, Canceled, Rejected)
-- **Executions**: Execution reports linked to orders with fill quantities and prices
+- **Orders**: FIX order representations with status tracking (New, PartiallyFilled, Filled, Canceled, Rejected) and partial fill support (cumQty, leavesQty, avgPx fields for tracking cumulative fills and weighted average price)
+- **Executions**: Execution reports linked to orders with fill quantities (lastQty, lastPx) and running totals (cumQty, leavesQty, avgPx)
 - **Allocations**: Post-trade allocation instructions with account-level breakdowns and confirmation states
 - **FIX Messages**: Raw FIX protocol message storage with sender/receiver tracking
 
@@ -92,12 +101,12 @@ Preferred communication style: Simple, everyday language.
 - **class-variance-authority**: Type-safe variant styling for component APIs
 - **PostCSS & Autoprefixer**: CSS processing pipeline
 
-### Database (Configured, Not Yet Implemented)
-- **Drizzle ORM**: TypeScript ORM with PostgreSQL dialect configuration
+### Database (PostgreSQL)
+- **Drizzle ORM**: TypeScript ORM with PostgreSQL dialect for type-safe database operations
 - **@neondatabase/serverless**: Serverless PostgreSQL client (Neon database provider)
-- **drizzle-zod**: Schema-to-Zod validator generation
+- **drizzle-zod**: Schema-to-Zod validator generation for form validation
 
-The application is structured for PostgreSQL migration with schema definitions and migration configuration in place, currently operating with in-memory storage.
+All application data persists to PostgreSQL: users, sessions, participants, orders, executions, allocations, and FIX messages. Database schema uses snake_case column naming conventions. Migration workflow: modify `shared/schema.ts` → run `npm run db:push` to sync changes.
 
 ### Development Tools
 - **Vite**: Build tool and development server with HMR
