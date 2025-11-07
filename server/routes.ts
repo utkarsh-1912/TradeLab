@@ -76,6 +76,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(allocations);
   });
 
+  // Export session messages
+  app.get("/api/sessions/:id/export", async (req, res) => {
+    const format = req.query.format as string || 'json';
+    const messages = await storage.getMessagesBySession(req.params.id);
+    const session = await storage.getSession(req.params.id);
+    
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    if (format === 'csv') {
+      const headers = ['Timestamp', 'Direction', 'Message Type', 'From', 'To', 'Raw FIX'];
+      const rows = messages.map(msg => [
+        new Date(msg.createdAt).toISOString(),
+        msg.direction,
+        msg.messageType,
+        msg.fromRole,
+        msg.toRole || '',
+        msg.rawFix
+      ]);
+      
+      const csv = [headers, ...rows]
+        .map(row => row.map(cell => `"${cell}"`).join(','))
+        .join('\n');
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${session.name}-messages.csv"`);
+      res.send(csv);
+    } else {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${session.name}-messages.json"`);
+      res.json(messages);
+    }
+  });
+
+  // Import session messages
+  app.post("/api/sessions/:id/import", async (req, res) => {
+    try {
+      const sessionId = req.params.id;
+      const session = await storage.getSession(sessionId);
+      
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      const messages = req.body;
+      
+      if (!Array.isArray(messages)) {
+        return res.status(400).json({ error: "Invalid format: expected array of messages" });
+      }
+
+      let importedCount = 0;
+      for (const msg of messages) {
+        await storage.createMessage({
+          sessionId,
+          direction: msg.direction,
+          messageType: msg.messageType,
+          rawFix: msg.rawFix,
+          parsed: msg.parsed,
+          fromRole: msg.fromRole,
+          toRole: msg.toRole,
+        });
+        importedCount++;
+      }
+
+      res.json({ success: true, importedCount });
+    } catch (error) {
+      console.error("Import error:", error);
+      res.status(500).json({ error: "Failed to import messages" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket Server

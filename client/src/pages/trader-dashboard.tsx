@@ -10,6 +10,7 @@ import { ExecutionLog } from "@/components/execution-log";
 import { MessageTimeline } from "@/components/message-timeline";
 import { AllocationWizard } from "@/components/allocation-wizard";
 import { ReplaceOrderDialog } from "@/components/replace-order-dialog";
+import { ExportImport } from "@/components/export-import";
 import { LogOut, PieChart } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import type { Order, Execution, FIXMessage, AllocationType, AllocationAccount } from "@shared/schema";
@@ -206,6 +207,13 @@ export default function TraderDashboard() {
         </div>
         <div className="flex items-center gap-4">
           <ConnectionStatus connected={connected} role={username} />
+          <ExportImport 
+            sessionId={sessionId} 
+            sessionName={sessionName}
+            onMessagesImported={() => {
+              window.location.reload();
+            }}
+          />
           <Button
             data-testid="button-logout"
             variant="ghost"

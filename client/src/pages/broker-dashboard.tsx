@@ -10,6 +10,7 @@ import { ConnectionStatus } from "@/components/connection-status";
 import { SessionControlBar } from "@/components/session-control-bar";
 import { OrderBook } from "@/components/order-book";
 import { MessageTimeline } from "@/components/message-timeline";
+import { ExportImport } from "@/components/export-import";
 import { LogOut, Check, X } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import type { Order, Execution, FIXMessage, Allocation } from "@shared/schema";
@@ -253,6 +254,13 @@ export default function BrokerDashboard() {
         </div>
         <div className="flex items-center gap-4">
           <ConnectionStatus connected={connected} role={username} />
+          <ExportImport 
+            sessionId={sessionId} 
+            sessionName={sessionName}
+            onMessagesImported={() => {
+              window.location.reload();
+            }}
+          />
           <Button
             data-testid="button-logout"
             variant="ghost"

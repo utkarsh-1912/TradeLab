@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ConnectionStatus } from "@/components/connection-status";
 import { SessionControlBar } from "@/components/session-control-bar";
 import { MessageTimeline } from "@/components/message-timeline";
+import { ExportImport } from "@/components/export-import";
 import { LogOut, Check, X } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import type { Allocation, FIXMessage } from "@shared/schema";
@@ -135,6 +136,13 @@ export default function CustodianDashboard() {
         </div>
         <div className="flex items-center gap-4">
           <ConnectionStatus connected={connected} role={username} />
+          <ExportImport 
+            sessionId={sessionId} 
+            sessionName={sessionName}
+            onMessagesImported={() => {
+              window.location.reload();
+            }}
+          />
           <Button
             data-testid="button-logout"
             variant="ghost"
