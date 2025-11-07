@@ -12,6 +12,12 @@ FixLab is a browser-based integrated FIX protocol simulator that replicates fina
 - **Database Migration**: Completed PostgreSQL integration with Drizzle ORM, replacing in-memory storage with persistent database for all session data
 - **Message Export/Import**: Added JSON/CSV export functionality and JSON import capability for session messages
 - **CSV Batch Upload**: Implemented bulk order upload with CSV parsing and validation
+- **Broker Interface Reorganization** (Latest):
+  - Created dedicated BrokerOrdersPage (`/broker-orders`) for incoming order management with fill/reject actions, allocation responses, and pending cancel/replace request handling
+  - Simplified BrokerDashboard (`/broker`) to show only view-only OrderBook for monitoring all orders
+  - Added navigation button in broker header to access Orders page
+  - Implemented ScrollArea components throughout for consistent scrolling experience (600px height standard)
+  - Separated concerns: dashboard for monitoring, dedicated page for order actions
 
 ## User Preferences
 
@@ -27,11 +33,14 @@ Preferred communication style: Simple, everyday language.
 
 **State Management**: React hooks for local component state, TanStack Query (React Query) for server state management with WebSocket integration for real-time updates. The application maintains separate state slices for orders, executions, allocations, and FIX messages.
 
-**Routing**: Wouter for lightweight client-side routing with four primary routes:
+**Routing**: Wouter for lightweight client-side routing with primary routes:
 - Landing page (role selection and session join)
-- Trader dashboard
-- Broker dashboard  
-- Custodian dashboard
+- Trader dashboard (`/trader`)
+- Broker dashboard (`/broker`) - view-only order monitoring
+- Broker orders page (`/broker-orders`) - incoming order actions and allocation management
+- Custodian dashboard (`/custodian`)
+- Message logs page (`/messages`) - shared across all roles
+- Executions page (`/executions`) - shared across all roles
 
 **Real-time Communication**: Custom WebSocket client (`wsClient.ts`) managing bidirectional communication with event-based handlers for session state, order updates, execution reports, and allocation messages.
 
