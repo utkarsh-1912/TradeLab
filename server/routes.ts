@@ -148,6 +148,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Symbol Search API (Yahoo Finance proxy)
+  const symbolSearchCache = new Map<string, { data: any; timestamp: number }>();
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  // Rate limiting: Simple token bucket implementation
+  const rateLimitMap = new Map<string, { tokens: number; lastRefill: number }>();
+  const RATE_LIMIT_TOKENS = 20; // 20 requests
+  const RATE_LIMIT_WINDOW = 60 * 1000; // per minute
+  const RATE_LIMIT_REFILL_RATE = RATE_LIMIT_TOKENS / RATE_LIMIT_WINDOW; // tokens per ms
+
+  const checkRateLimit = (ip: string): boolean => {
+    const now = Date.now();
+    let bucket = rateLimitMap.get(ip);
+
+    if (!bucket) {
+      bucket = { tokens: RATE_LIMIT_TOKENS, lastRefill: now };
+      rateLimitMap.set(ip, bucket);
+    }
+
+    // Refill tokens based on time elapsed
+    const elapsed = now - bucket.lastRefill;
+    bucket.tokens = Math.min(RATE_LIMIT_TOKENS, bucket.tokens + elapsed * RATE_LIMIT_REFILL_RATE);
+    bucket.lastRefill = now;
+
+    // Check if we have tokens available
+    if (bucket.tokens >= 1) {
+      bucket.tokens -= 1;
+      return true;
+    }
+
+    return false;
+  };
+
+  // Cleanup old rate limit entries every 5 minutes
+  setInterval(() => {
+    const now = Date.now();
+    const entries = Array.from(rateLimitMap.entries());
+    for (const [ip, bucket] of entries) {
+      if (now - bucket.lastRefill > RATE_LIMIT_WINDOW * 2) {
+        rateLimitMap.delete(ip);
+      }
+    }
+  }, 5 * 60 * 1000);
+
+  app.get("/api/symbols/search", async (req, res) => {
+    // Rate limiting
+    const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+    if (!checkRateLimit(clientIp)) {
+      return res.status(429).json({ 
+        error: "Too many requests. Please try again later.",
+        retryAfter: Math.ceil(1 / RATE_LIMIT_REFILL_RATE)
+      });
+    }
+    try {
+      const query = req.query.q as string;
+      
+      // Validate query parameter
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: "Query parameter 'q' is required" });
+      }
+
+      // Sanitize query (remove special characters, limit length)
+      const sanitizedQuery = query.trim().slice(0, 50).replace(/[^\w\s.-]/g, '');
+      
+      if (sanitizedQuery.length < 1) {
+        return res.status(400).json({ error: "Query too short" });
+      }
+
+      // Check cache
+      const cacheKey = sanitizedQuery.toLowerCase();
+      const cached = symbolSearchCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+        return res.json(cached.data);
+      }
+
+      // Fetch from Yahoo Finance
+      const yahooUrl = `https://query2.finance.yahoo.com/v1/finance/search`;
+      const params = new URLSearchParams({
+        q: sanitizedQuery,
+        quotesCount: '10',
+        lang: 'en-US',
+        region: 'US'
+      });
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+      const response = await fetch(`${yahooUrl}?${params}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        console.error(`Yahoo Finance API error: ${response.status}`);
+        return res.status(response.status).json({ error: "Symbol search service unavailable" });
+      }
+
+      const data = await response.json();
+      
+      // Validate response structure
+      if (!data || typeof data !== 'object') {
+        return res.status(500).json({ error: "Invalid response from symbol search service" });
+      }
+
+      // Extract and sanitize quotes
+      const quotes = (data.quotes || []).map((quote: any) => ({
+        symbol: String(quote.symbol || ''),
+        shortname: String(quote.shortname || quote.longname || ''),
+        longname: String(quote.longname || quote.shortname || ''),
+        quoteType: String(quote.quoteType || 'EQUITY'),
+        exchange: String(quote.exchange || ''),
+        exchDisp: String(quote.exchDisp || quote.exchange || ''),
+      })).filter((quote: any) => quote.symbol); // Only include items with symbols
+
+      const result = { quotes };
+
+      // Cache the result
+      symbolSearchCache.set(cacheKey, { data: result, timestamp: Date.now() });
+
+      // Clean old cache entries (every 100 requests)
+      if (symbolSearchCache.size > 100) {
+        const now = Date.now();
+        const entries = Array.from(symbolSearchCache.entries());
+        for (const [key, value] of entries) {
+          if (now - value.timestamp > CACHE_TTL) {
+            symbolSearchCache.delete(key);
+          }
+        }
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        return res.status(504).json({ error: "Symbol search request timed out" });
+      }
+      console.error("Symbol search error:", error);
+      res.status(500).json({ error: "Failed to search symbols" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket Server

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { SymbolSearch } from "@/components/symbol-search";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import type { OrderSide, OrderType } from "@shared/schema";
 
@@ -67,15 +68,12 @@ export function OrderEntryForm({ onSubmit, disabled }: OrderEntryFormProps) {
               name="symbol"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium">Symbol</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      data-testid="input-symbol"
-                      placeholder="e.g., AAPL"
-                      className="h-9 uppercase font-mono"
+                    <SymbolSearch
+                      value={field.value}
+                      onSelect={(symbol) => field.onChange(symbol)}
+                      placeholder="Search for a symbol..."
                       disabled={disabled}
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                     />
                   </FormControl>
                   <FormMessage />
