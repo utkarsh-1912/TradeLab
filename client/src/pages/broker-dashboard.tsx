@@ -11,6 +11,7 @@ import { SessionControlBar } from "@/components/session-control-bar";
 import { OrderBook } from "@/components/order-book";
 import { MessageTimeline } from "@/components/message-timeline";
 import { ExportImport } from "@/components/export-import";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { LogOut, Check, X, MessageSquare, TrendingUp } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import type { Order, Execution, FIXMessage, Allocation } from "@shared/schema";
@@ -345,7 +346,9 @@ export default function BrokerDashboard() {
               <CardHeader className="pb-4">
                 <CardTitle className="text-lg font-semibold">Incoming Orders</CardTitle>
               </CardHeader>
-              <CardContent className="flex-1 overflow-y-auto space-y-3">
+              <CardContent className="flex-1 overflow-hidden">
+                <ScrollArea className="h-full">
+                  <div className="space-y-3 pr-4">
                 {newOrders.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <p className="text-sm">No incoming orders</p>
@@ -457,6 +460,8 @@ export default function BrokerDashboard() {
                     </Card>
                   ))
                 )}
+                  </div>
+                </ScrollArea>
               </CardContent>
             </Card>
 
@@ -536,7 +541,9 @@ export default function BrokerDashboard() {
               <CardHeader className="pb-4">
                 <CardTitle className="text-lg font-semibold">Allocation Management</CardTitle>
               </CardHeader>
-              <CardContent className="flex-1 overflow-y-auto space-y-3">
+              <CardContent className="flex-1 overflow-hidden">
+                <ScrollArea className="h-full">
+                  <div className="space-y-3 pr-4">
                 {allocations.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <p className="text-sm">No allocations</p>
@@ -584,6 +591,8 @@ export default function BrokerDashboard() {
                     </Card>
                   ))
                 )}
+                  </div>
+                </ScrollArea>
               </CardContent>
             </Card>
           </div>

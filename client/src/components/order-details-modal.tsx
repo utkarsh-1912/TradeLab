@@ -245,7 +245,7 @@ export function OrderDetailsModal({
                       {order.cumQty} / {order.leavesQty || order.quantity}
                     </div>
                   </div>
-                  {order.avgPx > 0 && (
+                  {order.avgPx !== undefined && order.avgPx > 0 && (
                     <div>
                       <div className="text-xs text-muted-foreground mb-1">Avg Price</div>
                       <div className="font-mono font-semibold">${order.avgPx.toFixed(2)}</div>
