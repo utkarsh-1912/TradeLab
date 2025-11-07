@@ -11,6 +11,8 @@ import { MessageTimeline } from "@/components/message-timeline";
 import { AllocationWizard } from "@/components/allocation-wizard";
 import { ReplaceOrderDialog } from "@/components/replace-order-dialog";
 import { ExportImport } from "@/components/export-import";
+import { CSVOrderUpload } from "@/components/csv-order-upload";
+import { CSVAllocationUpload } from "@/components/csv-allocation-upload";
 import { LogOut, PieChart } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import type { Order, Execution, FIXMessage, AllocationType, AllocationAccount } from "@shared/schema";
@@ -136,6 +138,16 @@ export default function TraderDashboard() {
     });
   };
 
+  const handleBatchOrdersSubmit = (orders: any[]) => {
+    orders.forEach((order) => {
+      wsClient.sendNewOrder(order);
+    });
+    toast({
+      title: "Batch Orders Submitted",
+      description: `${orders.length} orders submitted successfully`,
+    });
+  };
+
   const handleCancelOrder = (orderId: string) => {
     wsClient.send({
       type: "order.cancel",
@@ -183,6 +195,14 @@ export default function TraderDashboard() {
     toast({
       title: "Allocation Instruction Sent",
       description: `${allocType} allocation for ${accounts.length} accounts`,
+    });
+  };
+
+  const handleCSVAllocationSubmit = (orderId: string, allocType: AllocationType, accounts: AllocationAccount[]) => {
+    wsClient.sendAllocationInstruction({
+      orderId,
+      allocType,
+      accounts,
     });
   };
 
@@ -240,8 +260,18 @@ export default function TraderDashboard() {
       <div className="flex-1 overflow-hidden">
         <div className="h-full grid grid-cols-12 gap-4 p-4">
           {/* Left Sidebar - Order Entry */}
-          <div className="col-span-3">
+          <div className="col-span-3 flex flex-col gap-4">
             <OrderEntryForm onSubmit={handleOrderSubmit} disabled={!connected} />
+            <div className="flex flex-col gap-2">
+              <CSVOrderUpload 
+                onOrdersSubmit={handleBatchOrdersSubmit} 
+                disabled={!connected} 
+              />
+              <CSVAllocationUpload 
+                onAllocationSubmit={handleCSVAllocationSubmit} 
+                disabled={!connected} 
+              />
+            </div>
           </div>
 
           {/* Center - Orders and Executions */}
