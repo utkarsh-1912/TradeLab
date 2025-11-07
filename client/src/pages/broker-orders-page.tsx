@@ -3,13 +3,13 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, LogOut, Check, X } from "lucide-react";
+import { OrderFillModal } from "@/components/order-fill-modal";
+import { OrderDetailsModal } from "@/components/order-details-modal";
+import { ArrowLeft, LogOut, Eye } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
-import type { Order, Allocation } from "@shared/schema";
+import type { Order, Allocation, Execution, FIXMessage } from "@shared/schema";
 
 export default function BrokerOrdersPage() {
   const [, setLocation] = useLocation();
@@ -17,9 +17,12 @@ export default function BrokerOrdersPage() {
   const [connected, setConnected] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
-  const [fillPrices, setFillPrices] = useState<Record<string, string>>({});
-  const [fillQuantities, setFillQuantities] = useState<Record<string, string>>({});
+  const [executions, setExecutions] = useState<Execution[]>([]);
+  const [messages, setMessages] = useState<FIXMessage[]>([]);
   const [pendingReplaceDetails, setPendingReplaceDetails] = useState<Record<string, { quantity: number; price?: number }>>({});
+  const [fillModalOpen, setFillModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const username = localStorage.getItem("fixlab_username") || "Broker";
   const sessionId = localStorage.getItem("fixlab_session_id") || "";
@@ -38,6 +41,8 @@ export default function BrokerOrdersPage() {
       setConnected(true);
       setOrders(data.orders || []);
       setAllocations(data.allocations || []);
+      setExecutions(data.executions || []);
+      setMessages(data.messages || []);
       toast({
         title: "Connected",
         description: "Successfully joined session",
@@ -54,11 +59,40 @@ export default function BrokerOrdersPage() {
       );
     });
 
-    wsClient.on("order.replace.request", (data) => {
+    wsClient.on("order.cancel.pending", (updatedOrder: Order) => {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+      );
+    });
+
+    wsClient.on("order.replace.pending", (data: any) => {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === data.order.id ? data.order : o))
+      );
       setPendingReplaceDetails((prev) => ({
         ...prev,
-        [data.orderId]: { quantity: data.quantity, price: data.price },
+        [data.order.id]: {
+          quantity: data.newQuantity,
+          price: data.newPrice,
+        },
       }));
+    });
+
+    wsClient.on("execution.created", (execution: Execution) => {
+      setExecutions((prev) => [...prev, execution]);
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === execution.orderId
+            ? {
+                ...o,
+                cumQty: execution.cumQty,
+                leavesQty: execution.leavesQty,
+                avgPx: execution.avgPx,
+                status: execution.execType as Order["status"],
+              }
+            : o
+        )
+      );
     });
 
     wsClient.on("allocation.created", (allocation: Allocation) => {
@@ -69,6 +103,21 @@ export default function BrokerOrdersPage() {
       setAllocations((prev) =>
         prev.map((a) => (a.id === updatedAllocation.id ? updatedAllocation : a))
       );
+    });
+
+    wsClient.on("message.new", (msgData) => {
+      const message: FIXMessage = {
+        id: `msg-${Date.now()}-${Math.random()}`,
+        sessionId: sessionName,
+        direction: msgData.direction,
+        messageType: msgData.messageType,
+        rawFix: msgData.rawFix,
+        parsed: msgData.parsed,
+        timestamp: Date.now(),
+        fromRole: msgData.fromRole,
+        toRole: msgData.toRole,
+      };
+      setMessages((prev) => [message, ...prev]);
     });
 
     wsClient.on("error", (error) => {
@@ -97,43 +146,25 @@ export default function BrokerOrdersPage() {
     setLocation("/broker");
   };
 
-  const handleFillOrder = (orderId: string, partialQty?: number) => {
-    const price = fillPrices[orderId];
-    const order = orders.find(o => o.id === orderId);
-    
-    if (!order) return;
-    
-    const fillQty = partialQty || parseInt(fillQuantities[orderId] || String(order.leavesQty || order.quantity));
-    
-    if (!price || isNaN(parseFloat(price)) || isNaN(fillQty) || fillQty <= 0) {
-      toast({
-        title: "Invalid Input",
-        description: "Please enter valid price and quantity",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleOpenFillModal = (order: Order) => {
+    setSelectedOrder(order);
+    setFillModalOpen(true);
+  };
 
-    if (fillQty > (order.leavesQty || order.quantity)) {
-      toast({
-        title: "Invalid Quantity",
-        description: `Cannot fill more than ${order.leavesQty || order.quantity} shares`,
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleOpenDetailsModal = (order: Order) => {
+    setSelectedOrder(order);
+    setDetailsModalOpen(true);
+  };
 
+  const handleFillOrder = (orderId: string, quantity: number, price: number) => {
     wsClient.send({
       type: "order.fill",
-      data: { orderId, quantity: fillQty, price: parseFloat(price) },
+      data: { orderId, quantity, price },
     });
-    
-    setFillPrices({ ...fillPrices, [orderId]: "" });
-    setFillQuantities({ ...fillQuantities, [orderId]: "" });
     
     toast({
       title: "Order Filled",
-      description: `Filled ${fillQty} @ $${price}`,
+      description: `Filled ${quantity} @ $${price.toFixed(2)}`,
     });
   };
 
@@ -262,7 +293,7 @@ export default function BrokerOrdersPage() {
                       </div>
                     ) : (
                       newOrders.map((order) => (
-                        <Card key={order.id} className="p-4" data-testid={`card-order-${order.id}`}>
+                        <Card key={order.id} className="p-4 hover-elevate" data-testid={`card-order-${order.id}`}>
                           <div className="space-y-3">
                             <div className="flex items-start justify-between">
                               <div className="space-y-1">
@@ -271,6 +302,9 @@ export default function BrokerOrdersPage() {
                                   <Badge variant={order.side === "Buy" ? "default" : "destructive"} className="text-xs">
                                     {order.side}
                                   </Badge>
+                                  <Badge variant="outline" className="text-xs">
+                                    {order.orderType}
+                                  </Badge>
                                 </div>
                                 <div className="font-mono text-xs text-muted-foreground">
                                   {order.clOrdId}
@@ -278,90 +312,36 @@ export default function BrokerOrdersPage() {
                               </div>
                               <div className="text-right space-y-1">
                                 <div className="font-mono text-base font-bold">{order.leavesQty || order.quantity}</div>
-                                <div className="text-xs text-muted-foreground">{order.orderType}</div>
+                                {order.price && (
+                                  <div className="text-xs text-muted-foreground">@ ${order.price.toFixed(2)}</div>
+                                )}
                                 {order.cumQty > 0 && (
                                   <div className="text-xs text-muted-foreground">
-                                    Filled: {order.cumQty} @ {order.avgPx?.toFixed(2)}
+                                    Filled: {order.cumQty} @ ${order.avgPx?.toFixed(2)}
                                   </div>
                                 )}
                               </div>
                             </div>
                             
-                            <div className="space-y-2 pt-2 border-t">
-                              <div className="grid grid-cols-12 gap-2">
-                                <div className="col-span-6">
-                                  <Label className="text-xs font-medium mb-1.5 block">Quantity</Label>
-                                  <Input
-                                    data-testid={`input-fill-quantity-${order.id}`}
-                                    type="number"
-                                    placeholder={(order.leavesQty || order.quantity).toString()}
-                                    value={fillQuantities[order.id] || ""}
-                                    onChange={(e) => setFillQuantities({ ...fillQuantities, [order.id]: e.target.value })}
-                                    className="h-9 font-mono text-sm"
-                                  />
-                                </div>
-                                <div className="col-span-6">
-                                  <Label className="text-xs font-medium mb-1.5 block">Price</Label>
-                                  <Input
-                                    data-testid={`input-fill-price-${order.id}`}
-                                    type="number"
-                                    step="0.01"
-                                    placeholder={order.price ? order.price.toString() : "Price"}
-                                    value={fillPrices[order.id] || ""}
-                                    onChange={(e) => setFillPrices({ ...fillPrices, [order.id]: e.target.value })}
-                                    className="h-9 font-mono text-sm"
-                                  />
-                                </div>
-                              </div>
-                              
-                              <div className="flex gap-1.5">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs flex-1"
-                                  onClick={() => handleFillOrder(order.id, Math.round((order.leavesQty || order.quantity) * 0.25))}
-                                  disabled={!fillPrices[order.id]}
-                                >
-                                  25%
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs flex-1"
-                                  onClick={() => handleFillOrder(order.id, Math.round((order.leavesQty || order.quantity) * 0.5))}
-                                  disabled={!fillPrices[order.id]}
-                                >
-                                  50%
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 text-xs flex-1"
-                                  onClick={() => handleFillOrder(order.id, Math.round((order.leavesQty || order.quantity) * 0.75))}
-                                  disabled={!fillPrices[order.id]}
-                                >
-                                  75%
-                                </Button>
-                                <Button
-                                  data-testid={`button-fill-${order.id}`}
-                                  size="sm"
-                                  className="h-7 text-xs flex-1"
-                                  onClick={() => handleFillOrder(order.id)}
-                                  disabled={!fillPrices[order.id]}
-                                >
-                                  <Check className="h-3.5 w-3.5 mr-1" />
-                                  Fill
-                                </Button>
-                                <Button
-                                  data-testid={`button-reject-${order.id}`}
-                                  size="sm"
-                                  variant="destructive"
-                                  className="h-7"
-                                  onClick={() => handleRejectOrder(order.id)}
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
+                            <div className="flex gap-2 pt-2 border-t">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 h-9"
+                                onClick={() => handleOpenDetailsModal(order)}
+                                data-testid={`button-view-details-${order.id}`}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                View
+                              </Button>
+                              <Button
+                                data-testid={`button-fill-${order.id}`}
+                                size="sm"
+                                className="flex-1 h-9"
+                                onClick={() => handleOpenFillModal(order)}
+                              >
+                                Fill Order
+                              </Button>
                             </div>
                           </div>
                         </Card>
@@ -508,6 +488,23 @@ export default function BrokerOrdersPage() {
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      <OrderFillModal
+        open={fillModalOpen}
+        onClose={() => setFillModalOpen(false)}
+        order={selectedOrder}
+        onFill={handleFillOrder}
+        onReject={handleRejectOrder}
+      />
+
+      <OrderDetailsModal
+        open={detailsModalOpen}
+        onClose={() => setDetailsModalOpen(false)}
+        order={selectedOrder}
+        executions={executions}
+        messages={messages}
+      />
     </div>
   );
 }
