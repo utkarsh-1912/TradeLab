@@ -6,6 +6,7 @@ import { ConnectionStatus } from "@/components/connection-status";
 import { SessionControlBar } from "@/components/session-control-bar";
 import { OrderEntryModal } from "@/components/order-entry-modal";
 import { OrderBook } from "@/components/order-book";
+import { OrderDetailsModal } from "@/components/order-details-modal";
 import { AllocationWizard } from "@/components/allocation-wizard";
 import { ReplaceOrderDialog } from "@/components/replace-order-dialog";
 import { ExportImport } from "@/components/export-import";
@@ -25,6 +26,7 @@ export default function TraderDashboard() {
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [messages, setMessages] = useState<FIXMessage[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orderDetailsOpen, setOrderDetailsOpen] = useState(false);
   const [allocationWizardOpen, setAllocationWizardOpen] = useState(false);
   const [replaceDialogOpen, setReplaceDialogOpen] = useState(false);
   const [orderToReplace, setOrderToReplace] = useState<Order | null>(null);
@@ -160,6 +162,11 @@ export default function TraderDashboard() {
       setOrderToReplace(order);
       setReplaceDialogOpen(true);
     }
+  };
+
+  const handleOrderClick = (order: Order) => {
+    setSelectedOrder(order);
+    setOrderDetailsOpen(true);
   };
 
   const handleReplaceSubmit = (orderId: string, quantity: number, price?: number) => {
@@ -305,6 +312,7 @@ export default function TraderDashboard() {
               orders={orders}
               onCancel={handleCancelOrder}
               onReplace={handleReplaceOrder}
+              onOrderClick={handleOrderClick}
               showActions={true}
             />
           </div>
@@ -325,6 +333,20 @@ export default function TraderDashboard() {
         onOpenChange={setReplaceDialogOpen}
         order={orderToReplace}
         onSubmit={handleReplaceSubmit}
+      />
+
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        open={orderDetailsOpen}
+        onClose={() => setOrderDetailsOpen(false)}
+        order={selectedOrder}
+        executions={executions}
+        messages={messages}
+        onUpdateOrder={(orderId, updates) => {
+          if (updates.quantity || updates.price) {
+            handleReplaceSubmit(orderId, updates.quantity || 0, updates.price);
+          }
+        }}
       />
     </div>
   );

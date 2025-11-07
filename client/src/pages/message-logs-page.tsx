@@ -148,6 +148,15 @@ export default function MessageLogsPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBackToDashboard}
+                data-testid="button-back-dashboard"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Dashboard
+              </Button>
               <Badge variant={connected ? "default" : "secondary"} data-testid="status-connection">
                 {connected ? "Connected" : "Disconnected"}
               </Badge>
@@ -246,7 +255,8 @@ export default function MessageLogsPage() {
             <CardTitle>Messages ({filteredMessages.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3 max-h-[600px] overflow-y-auto">
+            <ScrollArea className="h-[600px]">
+              <div className="space-y-3 pr-4">
               {filteredMessages.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   {messages.length === 0 ? "No messages yet" : "No messages match the current filters"}
@@ -297,7 +307,8 @@ export default function MessageLogsPage() {
                   </div>
                 ))
               )}
-            </div>
+              </div>
+            </ScrollArea>
           </CardContent>
         </Card>
       </div>

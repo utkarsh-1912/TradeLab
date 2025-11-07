@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, RefreshCw } from "lucide-react";
 import type { Order } from "@shared/schema";
 
@@ -62,21 +63,22 @@ export function OrderBook({ orders, onCancel, onReplace, onOrderClick, showActio
       </CardHeader>
       <CardContent>
         <div className="rounded-lg border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold text-xs">Order ID</TableHead>
-                <TableHead className="font-semibold text-xs">Symbol</TableHead>
-                <TableHead className="font-semibold text-xs">Side</TableHead>
-                <TableHead className="font-semibold text-xs text-right">Qty</TableHead>
-                <TableHead className="font-semibold text-xs text-right">Price</TableHead>
-                <TableHead className="font-semibold text-xs">Type</TableHead>
-                <TableHead className="font-semibold text-xs">Status</TableHead>
-                <TableHead className="font-semibold text-xs text-right">Filled</TableHead>
-                {showActions && <TableHead className="font-semibold text-xs">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <ScrollArea className="h-[600px]">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background z-10">
+                <TableRow className="bg-muted/50">
+                  <TableHead className="font-semibold text-xs">Order ID</TableHead>
+                  <TableHead className="font-semibold text-xs">Symbol</TableHead>
+                  <TableHead className="font-semibold text-xs">Side</TableHead>
+                  <TableHead className="font-semibold text-xs text-right">Qty</TableHead>
+                  <TableHead className="font-semibold text-xs text-right">Price</TableHead>
+                  <TableHead className="font-semibold text-xs">Type</TableHead>
+                  <TableHead className="font-semibold text-xs">Status</TableHead>
+                  <TableHead className="font-semibold text-xs text-right">Filled</TableHead>
+                  {showActions && <TableHead className="font-semibold text-xs">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
               {orders.map((order) => (
                 <TableRow
                   key={order.id}
@@ -147,8 +149,9 @@ export function OrderBook({ orders, onCancel, onReplace, onOrderClick, showActio
                   )}
                 </TableRow>
               ))}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </ScrollArea>
         </div>
       </CardContent>
     </Card>

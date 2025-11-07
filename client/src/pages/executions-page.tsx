@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LogOut, Download, Search, Filter, TrendingUp, TrendingDown } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { LogOut, Download, Search, Filter, TrendingUp, TrendingDown, ArrowLeft } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Execution } from "@shared/schema";
@@ -67,6 +69,15 @@ export default function ExecutionsPage() {
     localStorage.removeItem("fixlab_role");
     wsClient.disconnect();
     setLocation("/");
+  };
+
+  const handleBackToDashboard = () => {
+    const dashboardRoutes = {
+      Trader: "/trader",
+      Broker: "/broker",
+      Custodian: "/custodian",
+    };
+    setLocation(dashboardRoutes[role]);
   };
 
   const handleExport = () => {
@@ -162,6 +173,15 @@ export default function ExecutionsPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBackToDashboard}
+                data-testid="button-back-dashboard"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Dashboard
+              </Button>
               <Badge variant={connected ? "default" : "secondary"} data-testid="status-connection">
                 {connected ? "Connected" : "Disconnected"}
               </Badge>
@@ -256,89 +276,91 @@ export default function ExecutionsPage() {
             <CardTitle>Executions ({filteredExecutions.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              {filteredExecutions.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  {executions.length === 0 ? "No executions yet" : "No executions match the current filters"}
-                </div>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left p-3 font-medium">Time</th>
-                      <th className="text-left p-3 font-medium">ExecID</th>
-                      <th className="text-left p-3 font-medium">Symbol</th>
-                      <th className="text-left p-3 font-medium">Side</th>
-                      <th className="text-left p-3 font-medium">Type</th>
-                      <th className="text-right p-3 font-medium">Last Qty</th>
-                      <th className="text-right p-3 font-medium">Last Px</th>
-                      <th className="text-right p-3 font-medium">Cum Qty</th>
-                      <th className="text-right p-3 font-medium">Avg Px</th>
-                      <th className="text-right p-3 font-medium">Leaves Qty</th>
-                      <th className="text-left p-3 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredExecutions.map((exec, index) => (
-                      <tr
-                        key={exec.id || index}
-                        className="border-b hover-elevate"
-                        data-testid={`execution-row-${index}`}
-                      >
-                        <td className="p-3 text-muted-foreground" data-testid={`time-${index}`}>
-                          {new Date(exec.timestamp || Date.now()).toLocaleTimeString()}
-                        </td>
-                        <td className="p-3 font-mono text-xs" data-testid={`exec-id-${index}`}>
-                          {exec.execId}
-                        </td>
-                        <td className="p-3 font-semibold" data-testid={`symbol-${index}`}>
-                          {exec.symbol}
-                        </td>
-                        <td className="p-3" data-testid={`side-${index}`}>
-                          <Badge
-                            variant={exec.side === "Buy" ? "default" : "secondary"}
-                            className={exec.side === "Buy" ? "bg-green-600" : "bg-red-600"}
-                          >
-                            {exec.side === "Buy" ? (
-                              <TrendingUp className="h-3 w-3 mr-1" />
-                            ) : (
-                              <TrendingDown className="h-3 w-3 mr-1" />
-                            )}
-                            {exec.side}
-                          </Badge>
-                        </td>
-                        <td className="p-3" data-testid={`exec-type-${index}`}>
-                          <Badge variant="outline">
-                            {execTypeLabels[exec.execType] || exec.execType}
-                          </Badge>
-                        </td>
-                        <td className="p-3 text-right font-mono" data-testid={`last-qty-${index}`}>
-                          {exec.lastQty.toLocaleString()}
-                        </td>
-                        <td className="p-3 text-right font-mono" data-testid={`last-px-${index}`}>
-                          ${exec.lastPx.toFixed(2)}
-                        </td>
-                        <td className="p-3 text-right font-mono" data-testid={`cum-qty-${index}`}>
-                          {exec.cumQty.toLocaleString()}
-                        </td>
-                        <td className="p-3 text-right font-mono" data-testid={`avg-px-${index}`}>
-                          ${exec.avgPx.toFixed(2)}
-                        </td>
-                        <td className="p-3 text-right font-mono" data-testid={`leaves-qty-${index}`}>
-                          {exec.leavesQty.toLocaleString()}
-                        </td>
-                        <td className="p-3" data-testid={`status-${index}`}>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${getStatusColor(exec.orderStatus)}`} />
-                            {exec.orderStatus}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+            {filteredExecutions.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                {executions.length === 0 ? "No executions yet" : "No executions match the current filters"}
+              </div>
+            ) : (
+              <div className="rounded-lg border overflow-hidden">
+                <ScrollArea className="h-[600px]">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="font-medium text-xs">Time</TableHead>
+                        <TableHead className="font-medium text-xs">ExecID</TableHead>
+                        <TableHead className="font-medium text-xs">Symbol</TableHead>
+                        <TableHead className="font-medium text-xs">Side</TableHead>
+                        <TableHead className="font-medium text-xs">Type</TableHead>
+                        <TableHead className="font-medium text-xs text-right">Last Qty</TableHead>
+                        <TableHead className="font-medium text-xs text-right">Last Px</TableHead>
+                        <TableHead className="font-medium text-xs text-right">Cum Qty</TableHead>
+                        <TableHead className="font-medium text-xs text-right">Avg Px</TableHead>
+                        <TableHead className="font-medium text-xs text-right">Leaves Qty</TableHead>
+                        <TableHead className="font-medium text-xs">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredExecutions.map((exec, index) => (
+                        <TableRow
+                          key={exec.id || index}
+                          className="hover-elevate"
+                          data-testid={`execution-row-${index}`}
+                        >
+                          <TableCell className="text-muted-foreground text-xs" data-testid={`time-${index}`}>
+                            {new Date(exec.timestamp || Date.now()).toLocaleTimeString()}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs" data-testid={`exec-id-${index}`}>
+                            {exec.execId}
+                          </TableCell>
+                          <TableCell className="font-semibold text-sm" data-testid={`symbol-${index}`}>
+                            {exec.symbol}
+                          </TableCell>
+                          <TableCell data-testid={`side-${index}`}>
+                            <Badge
+                              variant={exec.side === "Buy" ? "default" : "secondary"}
+                              className={exec.side === "Buy" ? "bg-green-600" : "bg-red-600"}
+                            >
+                              {exec.side === "Buy" ? (
+                                <TrendingUp className="h-3 w-3 mr-1" />
+                              ) : (
+                                <TrendingDown className="h-3 w-3 mr-1" />
+                              )}
+                              {exec.side}
+                            </Badge>
+                          </TableCell>
+                          <TableCell data-testid={`exec-type-${index}`}>
+                            <Badge variant="outline" className="text-xs">
+                              {execTypeLabels[exec.execType] || exec.execType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm" data-testid={`last-qty-${index}`}>
+                            {exec.lastQty.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm" data-testid={`last-px-${index}`}>
+                            ${exec.lastPx.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm" data-testid={`cum-qty-${index}`}>
+                            {exec.cumQty.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm" data-testid={`avg-px-${index}`}>
+                            ${exec.avgPx.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm" data-testid={`leaves-qty-${index}`}>
+                            {exec.leavesQty.toLocaleString()}
+                          </TableCell>
+                          <TableCell data-testid={`status-${index}`}>
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${getStatusColor(exec.orderStatus)}`} />
+                              <span className="text-xs">{exec.orderStatus}</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
