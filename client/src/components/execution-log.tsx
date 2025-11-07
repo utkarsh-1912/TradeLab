@@ -85,25 +85,30 @@ export function ExecutionLog({ executions }: ExecutionLogProps) {
                       </div>
                       <div className="font-mono text-xs text-muted-foreground space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <span>Exec: {exec.execId}</span>
-                          <span>•</span>
                           <span className={exec.side === "Buy" ? "text-fix-buy font-semibold" : "text-fix-sell font-semibold"}>
                             {exec.side}
                           </span>
+                          <span>•</span>
+                          <span className="font-bold text-foreground">
+                            {exec.lastQty} @ ${exec.lastPx.toFixed(2)}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span>Qty: {exec.lastQty} @ {exec.lastPx.toFixed(2)}</span>
-                          {exec.cumQty > 0 && (
+                          <span>Total: {exec.cumQty}</span>
+                          {exec.leavesQty > 0 ? (
                             <>
                               <span>•</span>
-                              <span>Avg: {exec.avgPx.toFixed(2)}</span>
+                              <span className="text-amber-600 dark:text-amber-400">Remaining: {exec.leavesQty}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>•</span>
+                              <span className="text-green-600 dark:text-green-400">Complete</span>
                             </>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span>Filled: {exec.cumQty}</span>
-                          <span>•</span>
-                          <span>Leaves: {exec.leavesQty}</span>
+                          <span>Avg Price: ${exec.avgPx.toFixed(2)}</span>
                         </div>
                       </div>
                     </div>

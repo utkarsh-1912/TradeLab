@@ -2,217 +2,227 @@
 
 ## Design Approach
 
-**Selected Approach:** Design System - Material Design influenced with Bloomberg Terminal density patterns
+**Selected Approach:** Reference-Based - Robinhood/Coinbase Modern Fintech Aesthetic
 
-**Justification:** FixLab is a utility-focused, information-dense financial trading application where efficiency, data clarity, and learnability are paramount. The design draws from:
-- Material Design for consistent component patterns and elevation system
-- Bloomberg Terminal for information density and professional financial UI conventions
-- Linear for clean typography hierarchy and modern data presentation
-- Robinhood for accessible financial interfaces that don't intimidate
+**Justification:** FixLab transforms traditional financial trading interfaces into an accessible, modern fintech application. Drawing inspiration from:
+- Robinhood for clean, card-based layouts and vibrant buy/sell interactions
+- Coinbase for data-dense yet scannable trading interfaces
+- Webull for professional charting and real-time updates
+- Linear for typography hierarchy and polished micro-interactions
 
 **Core Design Principles:**
-1. Information density without clutter - maximize data visibility while maintaining scanability
-2. Instant visual feedback for all state changes (orders, executions, allocations)
-3. Professional credibility - instill confidence in a financial simulation tool
-4. Role-based visual clarity - clear differentiation between Trader/Broker/Custodian interfaces
+1. Clarity through whitespace - generous padding between information clusters
+2. Instant visual feedback with smooth animations and color-coded states
+3. Card-based architecture for modular, scannable content
+4. Dark mode first - optimized contrast for extended trading sessions
+5. Accessible professionalism - powerful yet approachable
 
 ## Typography System
 
 **Font Families:**
-- Primary: 'Inter' - UI text, labels, buttons (400, 500, 600, 700 weights)
-- Monospace: 'JetBrains Mono' - FIX message raw text, order IDs, timestamps, numerical data
+- Primary: 'Inter' (400, 500, 600, 700) via Google Fonts CDN
+- Monospace: 'JetBrains Mono' (400, 500) for financial data, FIX messages, order IDs
 
 **Hierarchy:**
-- Dashboard Headers: text-2xl font-semibold (24px)
-- Section Headers: text-lg font-semibold (18px)
-- Card Titles: text-base font-medium (16px)
-- Body/Form Labels: text-sm font-medium (14px)
-- Table Data: text-sm font-normal (14px)
-- Timestamps/Meta: text-xs font-normal (12px)
-- FIX Messages: text-xs font-mono (12px monospace)
+- Page Headers: text-3xl font-bold (30px)
+- Section Headers: text-xl font-semibold (20px)
+- Card Headers: text-lg font-semibold (18px)
+- Body Text: text-base font-medium (16px)
+- Labels/Captions: text-sm font-medium (14px)
+- Data Tables: text-sm font-normal (14px)
+- Metadata: text-xs font-normal (12px)
+- Financial Data: text-sm font-mono (14px monospace)
 
 ## Layout System
 
-**Spacing Primitives:** Use Tailwind units of 2, 4, 6, and 8 consistently
-- Micro spacing (gaps, padding): p-2, gap-2 (8px)
-- Standard spacing (cards, sections): p-4, gap-4 (16px)
-- Section spacing: p-6, gap-6 (24px)
-- Major section breaks: p-8, mb-8 (32px)
+**Spacing Primitives:** Tailwind units of 3, 4, 6, 8, 12
+- Card internal padding: p-6
+- Section spacing: gap-6, mb-8
+- Component gaps: gap-4
+- Micro spacing: gap-3, p-3
+- Major breaks: mb-12, py-12
 
-**Grid Structure:**
-- Dashboard containers: max-w-7xl mx-auto
-- Two-column layouts: grid grid-cols-1 lg:grid-cols-2 gap-6
-- Three-column data: grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4
-- Order books/blotters: Full-width tables with fixed headers
+**Containers:**
+- Dashboard max-width: max-w-7xl mx-auto px-4
+- Card grid: grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6
+- Full-width tables: w-full with internal max-w-7xl
 
 ## Component Library
 
 ### Core UI Elements
 
 **Buttons:**
-- Primary: Solid fill, rounded-lg, px-4 py-2, font-medium text-sm
-- Secondary: Border outline, rounded-lg, px-4 py-2
-- Icon buttons: p-2, rounded-lg for toolbar actions
-- Danger actions (Cancel/Reject): Distinct treatment
-- Success actions (Fill/Confirm): Distinct treatment
-
-**Input Fields:**
-- Standard: rounded-lg, px-3 py-2, border, text-sm
-- Numerical inputs: Monospace font for precision
-- Dropdowns: Full-width with chevron indicator
-- Multi-select: Pill-based tag selection for account allocation
+- Primary CTA: rounded-xl px-6 py-3 font-semibold text-base, gradient treatment
+- Buy Action: Vibrant green fill, rounded-xl px-6 py-3
+- Sell Action: Vibrant red fill, rounded-xl px-6 py-3
+- Secondary: Outlined with rounded-xl px-6 py-3
+- Icon buttons: rounded-lg p-3 for quick actions
+- Ghost buttons: Minimal styling for tertiary actions
 
 **Cards:**
-- Base: rounded-xl, border, shadow-sm
-- Elevated: shadow-md for active/focused states
-- Dashboard sections: p-6 internal padding
-- Nested cards: p-4 for sub-components
+- Base card: rounded-2xl shadow-lg backdrop-blur with subtle border
+- Elevated cards: shadow-xl for focus states
+- Nested cards: rounded-xl shadow-md
+- Internal padding: p-6 for standard, p-4 for compact
+- Header section: pb-4 border-b within card
 
-**Badges/Tags:**
-- Order status: rounded-full, px-3 py-1, text-xs font-medium
-- Role indicators: rounded-md, px-2 py-0.5, text-xs uppercase
-- Message direction: Inline tags for IN/OUT
+**Input Fields:**
+- Modern style: rounded-xl px-4 py-3 text-base with subtle border
+- Focus state: ring-2 with blue/purple accent
+- Numerical inputs: Monospace font (JetBrains Mono)
+- Symbol search: Autocomplete dropdown with icon prefix
+- Dropdowns: Full rounded-xl with chevron, smooth slide-in options
+
+**Badges & Status Indicators:**
+- Order status: rounded-full px-4 py-1.5 text-sm font-semibold
+- Live indicators: Animated pulse dot + text (green for active)
+- Message type tags: rounded-lg px-3 py-1 text-xs uppercase font-mono
+- Buy/Sell pills: Vibrant colors, rounded-full px-3 py-1
 
 ### Navigation
 
-**Top Navigation Bar:**
-- Fixed header: h-16, border-b, shadow-sm
-- Left: Logo + Session name
-- Center: Role indicator + connection status (live pulse animation)
-- Right: User dropdown, settings icon, notifications
+**Top Navigation:**
+- Sticky header: h-16 backdrop-blur shadow-sm
+- Left: FixLab logo + wordmark
+- Center: Session selector dropdown + role badge
+- Right: Connection status (animated pulse) + settings icon + user avatar
+- Bottom border with subtle gradient
 
-**Session Control Bar:**
-- Secondary bar below main nav: h-12
-- Role selector, session dropdown, latency toggle, reject simulation toggle
-- Connection status indicator with visual pulse for active connection
+**Session Controls:**
+- Floating control panel: Fixed bottom-right, rounded-2xl shadow-2xl
+- Toggle switches for latency simulation, reject modes
+- Collapse/expand with smooth animation
+- Badge counters for active messages
 
-### Forms
+### Forms & Wizards
 
-**Order Entry Form (Trader):**
-- Vertical layout in sidebar card (w-80 to w-96)
-- Symbol input (autocomplete dropdown)
-- Side selector (Buy/Sell radio buttons with distinct visual treatment)
-- Quantity input (numerical, monospace)
-- Order type dropdown (Market/Limit/Stop)
-- Price input (conditional on order type, monospace)
-- Submit button (full-width, prominent)
-- Clear/Reset link (text-sm, right-aligned)
+**Order Entry (Trader):**
+- Floating sidebar card: w-96 rounded-2xl shadow-xl
+- Symbol input: Large text-lg with autocomplete
+- Buy/Sell toggle: Pill-style segmented control with vibrant colors
+- Quantity: Large monospace input with step controls
+- Order type: Segmented control (Market/Limit/Stop)
+- Price: Conditional, monospace with currency prefix
+- Submit: Full-width gradient button text-lg font-bold
+- Quick actions: One-click market buy/sell shortcuts
 
-**Allocation Wizard (Multi-step):**
-- Step indicator at top (circles with connecting lines)
-- Step 1: Allocation method selector (4 large radio cards - Pro-rata, Percent, Fixed Qty, Average Price)
-- Step 2: Account entry with dynamic add/remove
-  - Account input + quantity/percent input pairs
-  - Live computation display showing total allocation
-  - Visual indicator when allocation sums to 100% or target quantity
-- Step 3: Review summary table with computed values
-- Bottom action bar: Back, Next/Submit buttons
+**Allocation Wizard:**
+- Full-screen overlay with centered max-w-4xl card
+- Progress steps: Circles with connecting lines, gradient on active
+- Step 1: Method selector - 4 large cards (16rem each) in grid-cols-2 gap-6
+- Step 2: Dynamic account rows with smooth add/remove animations
+- Live computation sidebar: Sticky right panel showing totals
+- Step 3: Summary table with expandable rows
+- Action bar: Fixed bottom with Back/Next gradient buttons
 
 ### Data Displays
 
-**Order Book/Blotter Tables:**
-- Sticky header with column sorting
-- Row height: h-10 for comfortable scanning
-- Alternating row treatment for readability
-- Monospace for all numerical columns (Order ID, Qty, Price)
-- Status column: Badge component
-- Action column: Icon buttons for Cancel/Modify
-- Hover state: Entire row highlight
-- Selected row: Persistent highlight with border-l accent
-
-**Message Timeline:**
-- Vertical timeline with alternating left/right layout
-- Incoming messages: Left-aligned
-- Outgoing messages: Right-aligned
-- Each message card:
-  - Timestamp header (text-xs, sticky to card top)
-  - Message type badge (35=D, 35=8, etc.)
-  - Tabbed view: Parsed JSON (default) | Raw FIX text (monospace)
-  - Expand/collapse for details
-- Visual connector line between related messages (New Order → Execution Report)
+**Order Cards:**
+- Individual order cards in vertical stack, gap-4
+- Card header: Symbol (text-xl font-bold) + Status badge + Timestamp
+- Body: Two-column grid showing Order ID, Side, Qty, Price (all monospace)
+- Footer: Action buttons (Cancel/Modify) right-aligned
+- Hover: Lift effect with shadow-2xl
+- Active orders: Subtle animated border pulse
 
 **Execution Log:**
-- Chronological list, most recent first
-- Each execution card (compact):
-  - Symbol + Side in header
-  - Qty @ Price (monospace, emphasized)
-  - Status badge + timestamp
-  - Expand for full FIX message details
+- Timeline layout with left line connector
+- Each execution: Compact card with rounded-xl
+- Time indicator: Absolute positioned, text-xs
+- Symbol + Side as header with color-coded pill
+- Price x Qty prominently displayed (text-lg font-mono)
+- Status badge + expand chevron
+- Expanded: Full FIX message with tabbed Raw/Parsed view
+
+**Message Timeline:**
+- Dual-column: Incoming (left) / Outgoing (right)
+- Message cards: rounded-xl with direction indicator
+- Color coding: Green tint for successful, red for rejects, blue for pending
+- Timestamp: text-xs at card top
+- Message type: Monospace badge (35=D, 35=8)
+- Content: Syntax-highlighted JSON with expand/collapse
+- Connection lines: Animated paths linking related messages
+
+**Data Tables:**
+- Sticky header with sorting indicators
+- Row height: h-12 for comfortable scanning
+- Hover: Smooth background transition
+- Selected: Gradient left border accent
+- Monospace columns: Order ID, Quantities, Prices
+- Status column: Badge components
+- Actions: Icon buttons that appear on row hover
 
 ### Overlays
 
-**Modal Dialogs:**
-- Backdrop: Semi-transparent overlay
-- Modal: max-w-2xl, rounded-2xl, shadow-2xl, centered
-- Header: border-b, px-6 py-4, flex justify-between
-- Body: px-6 py-4, scrollable if needed
-- Footer: border-t, px-6 py-4, action buttons right-aligned
+**Modals:**
+- Backdrop: Dark overlay with blur effect
+- Modal: max-w-2xl rounded-3xl shadow-2xl centered
+- Header: px-8 py-6 border-b with close button
+- Body: px-8 py-6 max-h-96 overflow-auto
+- Footer: px-8 py-6 border-t, actions right-aligned gap-3
 
 **Toast Notifications:**
-- Fixed position: top-right, stacked with gap-2
-- Success: Order filled, allocation confirmed
-- Warning: Partial fill, allocation pending
-- Error: Order rejected, allocation failed
-- Auto-dismiss: 5 seconds, slide-in/out animation
+- Fixed top-right, stacked gap-3
+- Card style: rounded-xl px-6 py-4 shadow-xl
+- Icon + Message + Close button
+- Color-coded: Green (success), Red (error), Yellow (warning), Blue (info)
+- Slide-in animation from right, auto-dismiss 5s
 
-**Session Selector Overlay (Initial):**
-- Full-screen centered card (max-w-md)
-- Logo at top
-- Username input (simple mock auth)
-- Role selection: 3 large cards (Trader, Broker, Custodian) with icons and descriptions
-- Session dropdown or "Create New Session" button
-- Prominent "Join Session" button
-
-## Dashboard-Specific Patterns
+## Dashboard Layouts
 
 ### Trader Dashboard
-**Layout:** Two-column with sidebar
-- Left sidebar (w-80): Order entry form (fixed)
-- Main area: 
-  - Top row: Active orders table (50% height)
-  - Bottom row: Execution log (50% height)
-- Right panel (collapsible): Message timeline
+- Main grid: 70% left / 30% right
+- Left: Order entry floating card (top-left) + Active orders grid below
+- Right: Execution log timeline
+- Bottom: Full-width message timeline (collapsible)
 
-### Broker Dashboard
-**Layout:** Full-width data-centric
-- Top section: Incoming orders queue (h-1/3 viewport)
-  - Each order as expandable card with quick Fill/Reject actions
-- Middle section: Execution blotter table (h-1/3 viewport)
-- Bottom section: Allocation management panel (h-1/3 viewport)
-  - Incoming allocation instructions with Accept/Reject
+### Broker Dashboard  
+- Three-row layout with equal heights
+- Row 1: Incoming orders - horizontal scroll of order cards
+- Row 2: Execution blotter table - sticky header
+- Row 3: Allocation management - card grid with quick actions
 
-### Allocation Desk (Specialized View)
-**Layout:** Wizard-style full-screen
-- Progress stepper at top
-- Main content area changes per step
-- Summary sidebar (right, w-96): Shows running totals, accounts, computed allocations
-- Fixed action bar at bottom
+### Session Launcher
+- Full-screen centered card (max-w-lg)
+- FixLab logo + gradient tagline
+- Username input (rounded-xl, large)
+- Role selector: 3 large cards with icons and descriptions (grid-cols-3 gap-4)
+- Session dropdown or "New Session" prominent button
+- "Start Trading" gradient button (text-xl)
+
+## Animations
+
+**Micro-interactions:**
+- Button hover: Subtle scale(1.02) + shadow increase
+- Card hover: Lift with translateY(-2px) + shadow-2xl
+- Status changes: Smooth color transitions (300ms)
+- Loading states: Skeleton shimmer effect
+- Success actions: Green checkmark animation
+- Connection pulse: 2s infinite opacity animation
 
 ## Data Visualization
 
-**Real-time Status Indicators:**
-- Connection status: Pulsing green dot for connected
-- Message count badges: Live update counter
-- Order status progression: Visual stepper (New → Partially Filled → Filled)
-
-**Numerical Emphasis:**
-- All quantities, prices, and IDs: JetBrains Mono font
-- Positive values (fills, confirmations): Success treatment
-- Negative values (cancels, rejects): Danger treatment
-- Pending states: Warning treatment
+**Real-time Indicators:**
+- Connection: Animated green pulse dot + "Connected" text
+- Message counter: Badge with slide-in number increment
+- Order status: Multi-step progress indicator
+- Price updates: Flash animation on change (green up, red down)
 
 **Empty States:**
-- No orders: Centered icon + "No active orders" + CTA to create first order
-- No messages: Timeline placeholder with sample message structure
-- No allocations: Illustration + "Create allocation instruction" guide
+- Centered illustration icon
+- Heading + description text
+- Prominent CTA button to add first item
+- Subtle background pattern for depth
 
 ## Accessibility
 
-- All interactive elements: Minimum 44x44px touch target
-- Form inputs: Visible focus rings (ring-2 ring-offset-2)
-- Tables: Keyboard navigation with focus indicators
-- Modals: Trap focus, ESC to close
-- Status changes: Toast notifications + screen reader announcements
-- Numerical inputs: Step controls for precision
+- Minimum 44px touch targets
+- Visible focus rings: ring-2 ring-offset-2
+- Keyboard navigation: Full table/card support
+- Modal focus trap with ESC close
+- Color contrast: WCAG AAA for dark mode
+- Screen reader announcements for status changes
 
-This design system ensures FixLab presents as a professional, efficient financial trading simulator with clear information hierarchy, instant feedback, and role-appropriate interfaces that instill user confidence in complex allocation workflows.
+## Images
+
+No hero images required. FixLab is a utility application focused on trading interfaces. All visual elements use cards, data displays, and functional UI components without marketing imagery.

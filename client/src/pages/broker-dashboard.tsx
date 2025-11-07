@@ -25,6 +25,7 @@ export default function BrokerDashboard() {
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [messages, setMessages] = useState<FIXMessage[]>([]);
   const [fillPrices, setFillPrices] = useState<Record<string, string>>({});
+  const [fillQuantities, setFillQuantities] = useState<Record<string, string>>({});
   const [pendingReplaceDetails, setPendingReplaceDetails] = useState<Record<string, { quantity: number; price?: number }>>({});
 
   const username = localStorage.getItem("fixlab_username") || "Broker";
@@ -144,26 +145,65 @@ export default function BrokerDashboard() {
     setLocation("/");
   };
 
-  const handleFillOrder = (orderId: string) => {
+  const handleFillOrder = (orderId: string, partialQty?: number) => {
     const price = fillPrices[orderId];
     const order = orders.find(o => o.id === orderId);
     if (!price || !order) return;
 
+    const parsedPrice = parseFloat(price);
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      toast({
+        title: "Invalid Price",
+        description: "Please enter a valid positive price",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Calculate fill quantity with validation
+    const remainingQty = order.leavesQty || order.quantity;
+    let fillQty = partialQty || (fillQuantities[orderId] ? parseInt(fillQuantities[orderId]) : remainingQty);
+    
+    // Validate quantity
+    if (isNaN(fillQty) || fillQty <= 0) {
+      toast({
+        title: "Invalid Quantity",
+        description: "Please enter a valid positive quantity",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Clamp to remaining quantity
+    if (fillQty > remainingQty) {
+      fillQty = remainingQty;
+      toast({
+        title: "Quantity Adjusted",
+        description: `Reduced to remaining quantity: ${remainingQty}`,
+      });
+    }
+
     wsClient.sendFillOrder({
       orderId,
-      fillQty: order.quantity,
-      fillPx: parseFloat(price),
+      fillQty,
+      fillPx: parsedPrice,
     });
 
+    const isPartialFill = fillQty < remainingQty;
     toast({
-      title: "Execution Sent",
-      description: `Filled ${order.quantity} @ ${price}`,
+      title: isPartialFill ? "Partial Fill" : "Full Fill",
+      description: `${order.symbol}: ${fillQty} @ ${parsedPrice.toFixed(2)}`,
     });
 
-    // Clear the price input
-    const newPrices = { ...fillPrices };
-    delete newPrices[orderId];
-    setFillPrices(newPrices);
+    // Clear the inputs if fully filled
+    if (!isPartialFill) {
+      const newPrices = { ...fillPrices };
+      const newQtys = { ...fillQuantities };
+      delete newPrices[orderId];
+      delete newQtys[orderId];
+      setFillPrices(newPrices);
+      setFillQuantities(newQtys);
+    }
   };
 
   const handleRejectOrder = (orderId: string) => {
@@ -304,25 +344,41 @@ export default function BrokerDashboard() {
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-base font-bold">{order.symbol}</span>
+                              <span className="font-mono text-lg font-bold">{order.symbol}</span>
                               <Badge variant={order.side === "Buy" ? "default" : "destructive"} className="text-xs">
                                 {order.side}
                               </Badge>
                             </div>
                             <div className="font-mono text-xs text-muted-foreground">
-                              Order ID: {order.clOrdId}
+                              {order.clOrdId}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-mono text-sm font-semibold">{order.quantity}</div>
+                          <div className="text-right space-y-1">
+                            <div className="font-mono text-base font-bold">{order.leavesQty || order.quantity}</div>
                             <div className="text-xs text-muted-foreground">{order.orderType}</div>
+                            {order.cumQty > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                Filled: {order.cumQty} @ {order.avgPx?.toFixed(2)}
+                              </div>
+                            )}
                           </div>
                         </div>
                         
                         <div className="space-y-2 pt-2 border-t">
-                          <div className="grid grid-cols-12 gap-2 items-end">
-                            <div className="col-span-8">
-                              <Label className="text-xs font-medium mb-1 block">Fill Price</Label>
+                          <div className="grid grid-cols-12 gap-2">
+                            <div className="col-span-6">
+                              <Label className="text-xs font-medium mb-1.5 block">Quantity</Label>
+                              <Input
+                                data-testid={`input-fill-quantity-${order.id}`}
+                                type="number"
+                                placeholder={(order.leavesQty || order.quantity).toString()}
+                                value={fillQuantities[order.id] || ""}
+                                onChange={(e) => setFillQuantities({ ...fillQuantities, [order.id]: e.target.value })}
+                                className="h-9 font-mono text-sm"
+                              />
+                            </div>
+                            <div className="col-span-6">
+                              <Label className="text-xs font-medium mb-1.5 block">Price</Label>
                               <Input
                                 data-testid={`input-fill-price-${order.id}`}
                                 type="number"
@@ -330,29 +386,58 @@ export default function BrokerDashboard() {
                                 placeholder={order.price ? order.price.toString() : "Price"}
                                 value={fillPrices[order.id] || ""}
                                 onChange={(e) => setFillPrices({ ...fillPrices, [order.id]: e.target.value })}
-                                className="h-8 font-mono text-sm"
+                                className="h-9 font-mono text-sm"
                               />
                             </div>
-                            <div className="col-span-4 flex gap-1">
-                              <Button
-                                data-testid={`button-fill-${order.id}`}
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleFillOrder(order.id)}
-                                disabled={!fillPrices[order.id]}
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                data-testid={`button-reject-${order.id}`}
-                                size="icon"
-                                variant="destructive"
-                                className="h-8 w-8"
-                                onClick={() => handleRejectOrder(order.id)}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
+                          </div>
+                          
+                          <div className="flex gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs flex-1"
+                              onClick={() => handleFillOrder(order.id, Math.round((order.leavesQty || order.quantity) * 0.25))}
+                              disabled={!fillPrices[order.id]}
+                            >
+                              25%
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs flex-1"
+                              onClick={() => handleFillOrder(order.id, Math.round((order.leavesQty || order.quantity) * 0.5))}
+                              disabled={!fillPrices[order.id]}
+                            >
+                              50%
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs flex-1"
+                              onClick={() => handleFillOrder(order.id, Math.round((order.leavesQty || order.quantity) * 0.75))}
+                              disabled={!fillPrices[order.id]}
+                            >
+                              75%
+                            </Button>
+                            <Button
+                              data-testid={`button-fill-${order.id}`}
+                              size="sm"
+                              className="h-7 text-xs flex-1"
+                              onClick={() => handleFillOrder(order.id)}
+                              disabled={!fillPrices[order.id]}
+                            >
+                              <Check className="h-3.5 w-3.5 mr-1" />
+                              Fill
+                            </Button>
+                            <Button
+                              data-testid={`button-reject-${order.id}`}
+                              size="sm"
+                              variant="destructive"
+                              className="h-7"
+                              onClick={() => handleRejectOrder(order.id)}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </div>
                       </div>
