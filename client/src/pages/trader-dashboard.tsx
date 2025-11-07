@@ -1,19 +1,17 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { ConnectionStatus } from "@/components/connection-status";
 import { SessionControlBar } from "@/components/session-control-bar";
-import { OrderEntryForm } from "@/components/order-entry-form";
+import { OrderEntryModal } from "@/components/order-entry-modal";
 import { OrderBook } from "@/components/order-book";
-import { ExecutionLog } from "@/components/execution-log";
-import { MessageTimeline } from "@/components/message-timeline";
 import { AllocationWizard } from "@/components/allocation-wizard";
 import { ReplaceOrderDialog } from "@/components/replace-order-dialog";
 import { ExportImport } from "@/components/export-import";
 import { CSVOrderUpload } from "@/components/csv-order-upload";
 import { CSVAllocationUpload } from "@/components/csv-allocation-upload";
-import { LogOut, PieChart } from "lucide-react";
+import { LogOut, PieChart, MessageSquare, TrendingUp } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import type { Order, Execution, FIXMessage, AllocationType, AllocationAccount } from "@shared/schema";
 
@@ -225,7 +223,20 @@ export default function TraderDashboard() {
           <div className="h-6 w-px bg-border" />
           <h2 className="text-base font-semibold text-muted-foreground">Trader Dashboard</h2>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <OrderEntryModal onSubmit={handleOrderSubmit} disabled={!connected} />
+          <Link href="/messages">
+            <Button variant="outline" size="sm" data-testid="button-view-messages">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Messages
+            </Button>
+          </Link>
+          <Link href="/executions">
+            <Button variant="outline" size="sm" data-testid="button-view-executions">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Executions
+            </Button>
+          </Link>
           <ConnectionStatus connected={connected} role={username} />
           <ExportImport 
             sessionId={sessionId} 
@@ -258,11 +269,10 @@ export default function TraderDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full grid grid-cols-12 gap-4 p-4">
-          {/* Left Sidebar - Order Entry */}
-          <div className="col-span-3 flex flex-col gap-4">
-            <OrderEntryForm onSubmit={handleOrderSubmit} disabled={!connected} />
-            <div className="flex flex-col gap-2">
+        <div className="h-full flex flex-col gap-4 p-6">
+          {/* Action Bar */}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
               <CSVOrderUpload 
                 onOrdersSubmit={handleBatchOrdersSubmit} 
                 disabled={!connected} 
@@ -272,45 +282,30 @@ export default function TraderDashboard() {
                 disabled={!connected} 
               />
             </div>
+            {orders.some(o => o.status === "Filled") && (
+              <Button
+                data-testid="button-open-allocation"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const filledOrder = orders.find(o => o.status === "Filled");
+                  if (filledOrder) handleOpenAllocation(filledOrder);
+                }}
+              >
+                <PieChart className="h-4 w-4 mr-2" />
+                Create Allocation
+              </Button>
+            )}
           </div>
 
-          {/* Center - Orders and Executions */}
-          <div className="col-span-6 flex flex-col gap-4 overflow-hidden">
-            <div className="flex-1 overflow-hidden">
-              <div className="h-full flex flex-col">
-                <OrderBook
-                  orders={orders}
-                  onCancel={handleCancelOrder}
-                  onReplace={handleReplaceOrder}
-                  showActions={true}
-                />
-                {orders.some(o => o.status === "Filled") && (
-                  <div className="mt-2">
-                    <Button
-                      data-testid="button-open-allocation"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const filledOrder = orders.find(o => o.status === "Filled");
-                        if (filledOrder) handleOpenAllocation(filledOrder);
-                      }}
-                      className="w-full"
-                    >
-                      <PieChart className="h-4 w-4 mr-2" />
-                      Create Allocation
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <ExecutionLog executions={executions} />
-            </div>
-          </div>
-
-          {/* Right Sidebar - Messages */}
-          <div className="col-span-3 overflow-hidden">
-            <MessageTimeline messages={messages} />
+          {/* Order Book */}
+          <div className="flex-1 overflow-hidden">
+            <OrderBook
+              orders={orders}
+              onCancel={handleCancelOrder}
+              onReplace={handleReplaceOrder}
+              showActions={true}
+            />
           </div>
         </div>
       </div>
