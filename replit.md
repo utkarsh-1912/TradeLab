@@ -12,12 +12,18 @@ FixLab is a browser-based integrated FIX protocol simulator that replicates fina
 - **Database Migration**: Completed PostgreSQL integration with Drizzle ORM, replacing in-memory storage with persistent database for all session data
 - **Message Export/Import**: Added JSON/CSV export functionality and JSON import capability for session messages
 - **CSV Batch Upload**: Implemented bulk order upload with CSV parsing and validation
-- **Broker Interface Reorganization** (Latest):
+- **Broker Interface Reorganization**:
   - Created dedicated BrokerOrdersPage (`/broker-orders`) for incoming order management with fill/reject actions, allocation responses, and pending cancel/replace request handling
   - Simplified BrokerDashboard (`/broker`) to show only view-only OrderBook for monitoring all orders
   - Added navigation button in broker header to access Orders page
   - Implemented ScrollArea components throughout for consistent scrolling experience (600px height standard)
   - Separated concerns: dashboard for monitoring, dedicated page for order actions
+- **Database Cleanup System** (Latest):
+  - Implemented automated daily cleanup at 2:00 AM using node-cron for NeonDB space optimization
+  - Configurable retention period via `RETENTION_DAYS` environment variable (default: 7 days)
+  - Cascading deletion order: sessions → participants → orders → executions/allocations → messages
+  - Manual cleanup API endpoint: `POST /api/admin/cleanup`
+  - Cleanup logs and API response include detailed deletion counts for all entity types (sessions, participants, orders, executions, allocations, messages)
 
 ## User Preferences
 
@@ -58,6 +64,8 @@ Preferred communication style: Simple, everyday language.
 - **Message Routing**: Role-based message distribution through WebSocket broadcast patterns
 
 **Storage Layer**: Abstracted storage interface (`IStorage`) with PostgreSQL database implementation (`DbStorage`) using Drizzle ORM. All session data (orders, executions, allocations, messages) persists to the database. Session replay capability allows rejoining sessions and loading complete historical state. Automatic schema migrations via `npm run db:push`.
+
+**Database Cleanup**: Automated cleanup system (`server/cleanup.ts`) runs daily at 2:00 AM to delete old data and optimize NeonDB space usage. Retention period is configurable via `RETENTION_DAYS` environment variable (default: 7 days). Manual cleanup can be triggered via `POST /api/admin/cleanup` endpoint. The cleanup process cascades through related entities in dependency order: sessions → orders → executions/allocations → messages.
 
 ### Data Models
 

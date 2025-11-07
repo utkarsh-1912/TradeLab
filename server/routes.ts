@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { AllocationEngine } from "./allocationEngine";
 import { fixEngine } from "./fixEngine";
 import { randomUUID } from "crypto";
+import { cleanupOldData } from "./cleanup";
 import type {
   ParticipantRole,
   FIXMessageType,
@@ -108,6 +109,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename="${session.name}-messages.json"`);
       res.json(messages);
+    }
+  });
+
+  // Manual database cleanup endpoint
+  app.post("/api/admin/cleanup", async (req, res) => {
+    try {
+      const result = await cleanupOldData();
+      if (result.success) {
+        res.json({
+          success: true,
+          message: "Database cleanup completed successfully",
+          deleted: result.deleted,
+          cutoffDate: result.cutoffDate,
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
     }
   });
 
@@ -720,6 +746,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        // Handle cancel reject (broker rejects cancel request)
+        if (message.type === 'order.cancel.reject' && client) {
+          const { orderId } = message.data;
+          const order = await storage.getOrder(orderId);
+          
+          if (!order) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Order not found' }));
+            return;
+          }
+
+          // Return order to previous status (New or PartiallyFilled)
+          const previousStatus = order.cumQty > 0 ? "PartiallyFilled" : "New";
+          await storage.updateOrderStatus(orderId, previousStatus, order.cumQty, order.avgPx);
+
+          broadcast(client.sessionId, {
+            type: 'order.updated',
+            data: await storage.getOrder(orderId)
+          });
+        }
+
         // Handle order replace request
         if (message.type === 'order.replace' && client) {
           const { orderId, quantity, price } = message.data;
@@ -843,6 +889,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           broadcast(client.sessionId, {
             type: 'message.new',
             data: { direction: "Incoming", messageType: "8", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: client.role }
+          });
+        }
+
+        // Handle replace reject (broker rejects replace request)
+        if (message.type === 'order.replace.reject' && client) {
+          const { orderId } = message.data;
+          const order = await storage.getOrder(orderId);
+          
+          if (!order) {
+            ws.send(JSON.stringify({ type: 'error', message: 'Order not found' }));
+            return;
+          }
+
+          // Return order to previous status (New or PartiallyFilled)
+          const previousStatus = order.cumQty > 0 ? "PartiallyFilled" : "New";
+          await storage.updateOrderStatus(orderId, previousStatus, order.cumQty, order.avgPx);
+
+          broadcast(client.sessionId, {
+            type: 'order.updated',
+            data: await storage.getOrder(orderId)
           });
         }
 

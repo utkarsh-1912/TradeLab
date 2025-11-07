@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import cron from "node-cron";
+import { cleanupOldData } from "./cleanup";
 
 const app = express();
 
@@ -77,5 +79,18 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Schedule daily cleanup at 2 AM
+    cron.schedule('0 2 * * *', async () => {
+      log('[Cron] Running scheduled database cleanup...');
+      const result = await cleanupOldData();
+      if (result.success) {
+        log(`[Cron] Cleanup completed: ${JSON.stringify(result.deleted)}`);
+      } else {
+        log(`[Cron] Cleanup failed: ${result.error}`);
+      }
+    });
+    
+    log('[Cron] Daily cleanup scheduled for 2:00 AM');
   });
 })();

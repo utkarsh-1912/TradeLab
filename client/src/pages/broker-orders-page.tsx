@@ -7,6 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { OrderFillModal } from "@/components/order-fill-modal";
 import { OrderDetailsModal } from "@/components/order-details-modal";
+import { OrderCancelModal } from "@/components/order-cancel-modal";
+import { OrderReplaceModal } from "@/components/order-replace-modal";
 import { ArrowLeft, LogOut, Eye, Check } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import type { Order, Allocation, Execution, FIXMessage } from "@shared/schema";
@@ -22,6 +24,8 @@ export default function BrokerOrdersPage() {
   const [pendingReplaceDetails, setPendingReplaceDetails] = useState<Record<string, { quantity: number; price?: number }>>({});
   const [fillModalOpen, setFillModalOpen] = useState(false);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [replaceModalOpen, setReplaceModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const username = localStorage.getItem("fixlab_username") || "Broker";
@@ -194,6 +198,16 @@ export default function BrokerOrdersPage() {
     });
   };
 
+  const handleOpenCancelModal = (order: Order) => {
+    setSelectedOrder(order);
+    setCancelModalOpen(true);
+  };
+
+  const handleOpenReplaceModal = (order: Order) => {
+    setSelectedOrder(order);
+    setReplaceModalOpen(true);
+  };
+
   const handleCancelAccept = (orderId: string) => {
     wsClient.send({
       type: "order.cancel.accept",
@@ -202,6 +216,18 @@ export default function BrokerOrdersPage() {
     toast({
       title: "Cancel Accepted",
       description: "Order has been canceled",
+    });
+  };
+
+  const handleCancelReject = (orderId: string) => {
+    wsClient.send({
+      type: "order.cancel.reject",
+      data: { orderId },
+    });
+    toast({
+      title: "Cancel Rejected",
+      description: "Order remains active",
+      variant: "destructive",
     });
   };
 
@@ -227,6 +253,25 @@ export default function BrokerOrdersPage() {
     toast({
       title: "Replace Accepted",
       description: `Modified to ${replaceDetails.quantity}${replaceDetails.price ? ` @ $${replaceDetails.price}` : ""}`,
+    });
+  };
+
+  const handleReplaceReject = (orderId: string) => {
+    wsClient.send({
+      type: "order.replace.reject",
+      data: { orderId },
+    });
+    
+    setPendingReplaceDetails((prev) => {
+      const updated = { ...prev };
+      delete updated[orderId];
+      return updated;
+    });
+    
+    toast({
+      title: "Replace Rejected",
+      description: "Order modification rejected",
+      variant: "destructive",
     });
   };
 
@@ -369,13 +414,12 @@ export default function BrokerOrdersPage() {
                           </div>
                         </div>
                         <Button
-                          data-testid={`button-accept-cancel-${order.id}`}
+                          data-testid={`button-review-cancel-${order.id}`}
                           size="sm"
                           className="h-8"
-                          onClick={() => handleCancelAccept(order.id)}
+                          onClick={() => handleOpenCancelModal(order)}
                         >
-                          <Check className="h-3.5 w-3.5 mr-1" />
-                          Accept Cancel
+                          Review
                         </Button>
                       </div>
                     </Card>
@@ -403,14 +447,12 @@ export default function BrokerOrdersPage() {
                               )}
                             </div>
                             <Button
-                              data-testid={`button-accept-replace-${order.id}`}
+                              data-testid={`button-review-replace-${order.id}`}
                               size="sm"
                               className="h-8"
-                              onClick={() => handleReplaceAccept(order.id)}
-                              disabled={!replaceDetails}
+                              onClick={() => handleOpenReplaceModal(order)}
                             >
-                              <Check className="h-3.5 w-3.5 mr-1" />
-                              Accept Replace
+                              Review
                             </Button>
                           </div>
                         </div>
@@ -501,6 +543,24 @@ export default function BrokerOrdersPage() {
         order={selectedOrder}
         executions={executions}
         messages={messages}
+      />
+
+      <OrderCancelModal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        order={selectedOrder}
+        onAccept={handleCancelAccept}
+        onReject={handleCancelReject}
+      />
+
+      <OrderReplaceModal
+        open={replaceModalOpen}
+        onClose={() => setReplaceModalOpen(false)}
+        order={selectedOrder}
+        newQuantity={selectedOrder ? pendingReplaceDetails[selectedOrder.id]?.quantity : undefined}
+        newPrice={selectedOrder ? pendingReplaceDetails[selectedOrder.id]?.price : undefined}
+        onAccept={handleReplaceAccept}
+        onReject={handleReplaceReject}
       />
     </div>
   );
