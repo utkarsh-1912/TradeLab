@@ -54,6 +54,28 @@ export const orders = pgTable("orders", {
   avgPx: real("avg_px"),
   cumQty: integer("cum_qty").notNull().default(0),
   leavesQty: integer("leaves_qty").notNull(),
+  
+  // Multi-asset class fields
+  assetClass: varchar("asset_class", { length: 20 }).notNull().default("Equity"),
+  securityType: varchar("security_type", { length: 10 }),
+  
+  // FX fields
+  currencyPair: text("currency_pair"),
+  settlementType: varchar("settlement_type", { length: 10 }),
+  settlementDate: text("settlement_date"),
+  
+  // Futures/Options fields
+  maturityMonthYear: text("maturity_month_year"),
+  contractMultiplier: real("contract_multiplier"),
+  strikePrice: real("strike_price"),
+  optionType: varchar("option_type", { length: 10 }), // "C" for Call, "P" for Put
+  expiryDate: text("expiry_date"),
+  underlyingSymbol: text("underlying_symbol"),
+  
+  // Fixed Income fields
+  couponRate: real("coupon_rate"),
+  maturityDate: text("maturity_date"),
+  accruedInterest: real("accrued_interest"),
 });
 
 // Executions
@@ -116,6 +138,12 @@ export type OrderSide = "Buy" | "Sell";
 
 // Order types
 export type OrderType = "Market" | "Limit" | "Stop" | "StopLimit";
+
+// Asset classes
+export type AssetClass = "Equity" | "FX" | "Futures" | "Options" | "FixedIncome";
+
+// Security types (FIX Tag 167)
+export type SecurityType = "CS" | "FUT" | "OPT" | "BOND" | "FOR" | "MLEG";
 
 // Order status (FIX OrdStatus values)
 export type OrderStatus = 
@@ -202,6 +230,28 @@ export interface Order {
   avgPx?: number;
   cumQty: number;
   leavesQty: number;
+  
+  // Multi-asset class fields
+  assetClass: AssetClass;
+  securityType?: SecurityType;
+  
+  // FX fields
+  currencyPair?: string;
+  settlementType?: string;
+  settlementDate?: string;
+  
+  // Futures/Options fields
+  maturityMonthYear?: string;
+  contractMultiplier?: number;
+  strikePrice?: number;
+  optionType?: "C" | "P";
+  expiryDate?: string;
+  underlyingSymbol?: string;
+  
+  // Fixed Income fields
+  couponRate?: number;
+  maturityDate?: string;
+  accruedInterest?: number;
 }
 
 export interface InsertOrder {
@@ -213,6 +263,22 @@ export interface InsertOrder {
   orderType: OrderType;
   price?: number;
   createdBy: ParticipantRole;
+  
+  // Multi-asset class fields
+  assetClass?: AssetClass;
+  securityType?: SecurityType;
+  currencyPair?: string;
+  settlementType?: string;
+  settlementDate?: string;
+  maturityMonthYear?: string;
+  contractMultiplier?: number;
+  strikePrice?: number;
+  optionType?: "C" | "P";
+  expiryDate?: string;
+  underlyingSymbol?: string;
+  couponRate?: number;
+  maturityDate?: string;
+  accruedInterest?: number;
 }
 
 // Execution
