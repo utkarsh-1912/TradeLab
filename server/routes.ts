@@ -153,9 +153,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WebSocket Server
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
-  wss.on('connection', (ws: WebSocket) => {
+  wss.on('error', (error) => {
+    console.error('[WS] WebSocket Server Error:', error);
+  });
+
+  wss.on('connection', (ws: WebSocket, req) => {
     const clientId = randomUUID();
     let client: WSClient | null = null;
+    console.log(`[WS] New WebSocket connection from ${req.socket.remoteAddress}`);
 
     ws.on('message', async (data: Buffer) => {
       try {
@@ -164,6 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Handle join event
         if (message.type === 'join') {
           const { sessionId: clientSessionId, sessionName, role, username } = message;
+          console.log(`[WS] Join request: role=${role}, username=${username}, sessionId=${clientSessionId}`);
           
           // Get session - it should already exist from landing page
           let session = await storage.getSession(clientSessionId);
@@ -171,6 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Fallback: create session with the provided name or use sessionId
             const name = sessionName || `Session-${clientSessionId.slice(0, 8)}`;
             session = await storage.createSession({ name });
+            console.log(`[WS] Created new session: ${session.id} (${session.name})`);
+          } else {
+            console.log(`[WS] Found existing session: ${session.id} (${session.name})`);
           }
 
           // Use the actual session ID from the database
