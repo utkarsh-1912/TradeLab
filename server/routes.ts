@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { AllocationEngine } from "./allocationEngine";
-import { validateFIXMessage, tagsToFIXString, parseFIXString } from "./fixValidation";
+import { fixEngine } from "./fixEngine";
 import { randomUUID } from "crypto";
 import type {
   ParticipantRole,
@@ -89,7 +89,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (format === 'csv') {
       const headers = ['Timestamp', 'Direction', 'Message Type', 'From', 'To', 'Raw FIX'];
       const rows = messages.map(msg => [
-        new Date(msg.createdAt).toISOString(),
+        new Date(msg.timestamp).toISOString(),
         msg.direction,
         msg.messageType,
         msg.fromRole,
@@ -380,7 +380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Handle new order
         if (message.type === 'order.new' && client) {
-          const { symbol, side, quantity, orderType, price } = message.data;
+          const { symbol, side, quantity, orderType, price, assetClass, securityType, currencyPair, maturityMonthYear, strikePrice, optionType, underlyingSymbol } = message.data;
           const clOrdId = `ORD-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
           const order = await storage.createOrder({
@@ -392,32 +392,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
             orderType,
             price,
             createdBy: client.role,
+            assetClass,
+            securityType,
+            currencyPair,
+            maturityMonthYear,
+            strikePrice,
+            optionType,
+            underlyingSymbol,
           });
 
-          // Create FIX message
-          const fixTags = {
-            "11": clOrdId,
-            "55": symbol,
-            "54": side === "Buy" ? "1" : "2",
-            "38": quantity.toString(),
-            "40": orderType === "Market" ? "1" : orderType === "Limit" ? "2" : "3",
-            "60": new Date().toISOString(),
-          };
+          // Create FIX message using new engine with multi-asset support
+          const fixMessage = fixEngine.buildNewOrderSingle({
+            clOrdId,
+            symbol,
+            side,
+            quantity,
+            orderType,
+            price,
+            assetClass,
+            securityType,
+            currencyPair,
+            maturityMonthYear,
+            strikePrice,
+            optionType,
+            underlyingSymbol,
+          });
 
-          if (price) {
-            fixTags["44"] = price.toString();
-          }
-
-          const rawFix = tagsToFIXString("D", fixTags);
-          const validation = validateFIXMessage("D", fixTags);
+          const validation = fixEngine.validateMessage(fixMessage);
 
           if (validation.valid) {
             await storage.createMessage({
               sessionId: client.sessionId,
               direction: "Outgoing",
               messageType: "D",
-              rawFix,
-              parsed: fixTags,
+              rawFix: fixMessage.rawFix,
+              parsed: fixMessage.tags,
               fromRole: client.role,
               toRole: "Broker",
             });
@@ -427,15 +436,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const senderLatency = participants.find(p => p.username === client.username)?.latencyMs || 0;
 
             setTimeout(() => {
+              const targetClient = client;
+              if (!targetClient) return;
+
               // Send to all clients in session
-              broadcast(client!.sessionId, {
+              broadcast(targetClient.sessionId, {
                 type: 'order.created',
                 data: order
               });
 
-              broadcast(client!.sessionId, {
+              broadcast(targetClient.sessionId, {
                 type: 'message.new',
-                data: { direction: "Incoming", messageType: "D", rawFix, parsed: fixTags, fromRole: client!.role }
+                data: { direction: "Incoming", messageType: "D", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: targetClient.role }
               });
             }, senderLatency);
           }
@@ -479,29 +491,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           await storage.updateOrderStatus(orderId, orderStatus, newCumQty, newAvgPx);
 
-          // Create FIX message
-          const fixTags = {
-            "11": order.clOrdId,
-            "17": execId,
-            "150": execType === "Fill" ? "2" : "1",
-            "39": isFilled ? "2" : "1",
-            "55": order.symbol,
-            "54": order.side === "Buy" ? "1" : "2",
-            "32": fillQty.toString(),
-            "31": fillPx.toString(),
-            "151": (order.quantity - newCumQty).toString(),
-            "14": newCumQty.toString(),
-            "6": newAvgPx.toString(),
-          };
-
-          const rawFix = tagsToFIXString("8", fixTags);
+          // Create FIX message using new engine
+          const fixMessage = fixEngine.buildExecutionReport({
+            orderId: order.id,
+            clOrdId: order.clOrdId,
+            execId,
+            execType,
+            orderStatus,
+            symbol: order.symbol,
+            side: order.side,
+            lastQty: fillQty,
+            lastPx: fillPx,
+            cumQty: newCumQty,
+            avgPx: newAvgPx,
+            leavesQty: order.quantity - newCumQty,
+          });
 
           await storage.createMessage({
             sessionId: client.sessionId,
             direction: "Outgoing",
             messageType: "8",
-            rawFix,
-            parsed: fixTags,
+            rawFix: fixMessage.rawFix,
+            parsed: fixMessage.tags,
             fromRole: client.role,
             toRole: "Trader",
           });
@@ -518,7 +529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           broadcast(client.sessionId, {
             type: 'message.new',
-            data: { direction: "Incoming", messageType: "8", rawFix, parsed: fixTags, fromRole: client.role }
+            data: { direction: "Incoming", messageType: "8", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: client.role }
           });
         }
 
@@ -552,28 +563,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           await storage.updateOrderStatus(orderId, "Rejected", order.cumQty, order.avgPx);
 
-          const fixTags = {
-            "11": order.clOrdId,
-            "17": execId,
-            "150": "8",
-            "39": "8",
-            "55": order.symbol,
-            "54": order.side === "Buy" ? "1" : "2",
-            "32": "0",
-            "31": "0",
-            "151": "0",
-            "14": order.cumQty.toString(),
-            "6": (order.avgPx || 0).toString(),
-          };
-
-          const rawFix = tagsToFIXString("8", fixTags);
+          const fixMessage = fixEngine.buildExecutionReport({
+            orderId: order.id,
+            clOrdId: order.clOrdId,
+            execId,
+            execType: "Rejected",
+            orderStatus: "Rejected",
+            symbol: order.symbol,
+            side: order.side,
+            lastQty: 0,
+            lastPx: 0,
+            cumQty: order.cumQty,
+            avgPx: order.avgPx || 0,
+            leavesQty: 0,
+          });
 
           await storage.createMessage({
             sessionId: client.sessionId,
             direction: "Outgoing",
             messageType: "8",
-            rawFix,
-            parsed: fixTags,
+            rawFix: fixMessage.rawFix,
+            parsed: fixMessage.tags,
             fromRole: client.role,
             toRole: "Trader",
           });
@@ -590,7 +600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           broadcast(client.sessionId, {
             type: 'message.new',
-            data: { direction: "Incoming", messageType: "8", rawFix, parsed: fixTags, fromRole: client.role }
+            data: { direction: "Incoming", messageType: "8", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: client.role }
           });
         }
 
@@ -610,22 +620,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const newClOrdId = `CXLREQ-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
           // Create FIX Cancel Request message
-          const fixTags = {
+          const fixMessage = fixEngine.buildGenericMessage("F", {
             "11": newClOrdId,
             "41": order.clOrdId,
             "55": order.symbol,
             "54": order.side === "Buy" ? "1" : "2",
             "60": new Date().toISOString(),
-          };
-
-          const rawFix = tagsToFIXString("F", fixTags);
+          });
 
           await storage.createMessage({
             sessionId: client.sessionId,
             direction: "Outgoing",
             messageType: "F",
-            rawFix,
-            parsed: fixTags,
+            rawFix: fixMessage.rawFix,
+            parsed: fixMessage.tags,
             fromRole: client.role,
             toRole: "Broker",
           });
@@ -637,7 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           broadcast(client.sessionId, {
             type: 'message.new',
-            data: { direction: "Incoming", messageType: "F", rawFix, parsed: fixTags, fromRole: client.role }
+            data: { direction: "Incoming", messageType: "F", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: client.role }
           });
         }
 
@@ -671,28 +679,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           await storage.updateOrderStatus(orderId, "Canceled", order.cumQty, order.avgPx);
 
-          const fixTags = {
-            "11": order.clOrdId,
-            "17": execId,
-            "150": "4",  // ExecType: Canceled
-            "39": "4",   // OrdStatus: Canceled
-            "55": order.symbol,
-            "54": order.side === "Buy" ? "1" : "2",
-            "32": "0",
-            "31": "0",
-            "151": "0",
-            "14": order.cumQty.toString(),
-            "6": (order.avgPx || 0).toString(),
-          };
-
-          const rawFix = tagsToFIXString("8", fixTags);
+          const fixMessage = fixEngine.buildExecutionReport({
+            orderId: order.id,
+            clOrdId: order.clOrdId,
+            execId,
+            execType: "Canceled",
+            orderStatus: "Canceled",
+            symbol: order.symbol,
+            side: order.side,
+            lastQty: 0,
+            lastPx: 0,
+            cumQty: order.cumQty,
+            avgPx: order.avgPx || 0,
+            leavesQty: 0,
+          });
 
           await storage.createMessage({
             sessionId: client.sessionId,
             direction: "Outgoing",
             messageType: "8",
-            rawFix,
-            parsed: fixTags,
+            rawFix: fixMessage.rawFix,
+            parsed: fixMessage.tags,
             fromRole: client.role,
             toRole: "Trader",
           });
@@ -709,7 +716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           broadcast(client.sessionId, {
             type: 'message.new',
-            data: { direction: "Incoming", messageType: "8", rawFix, parsed: fixTags, fromRole: client.role }
+            data: { direction: "Incoming", messageType: "8", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: client.role }
           });
         }
 
@@ -729,7 +736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const newClOrdId = `RPLREQ-${Date.now()}-${randomUUID().slice(0, 8)}`;
 
           // Create FIX Replace Request message
-          const fixTags = {
+          const fixTags: Record<string, string | number> = {
             "11": newClOrdId,
             "41": order.clOrdId,
             "55": order.symbol,
@@ -743,14 +750,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fixTags["44"] = price.toString();
           }
 
-          const rawFix = tagsToFIXString("G", fixTags);
+          const fixMessage = fixEngine.buildGenericMessage("G", fixTags);
 
           await storage.createMessage({
             sessionId: client.sessionId,
             direction: "Outgoing",
             messageType: "G",
-            rawFix,
-            parsed: fixTags,
+            rawFix: fixMessage.rawFix,
+            parsed: fixMessage.tags,
             fromRole: client.role,
             toRole: "Broker",
           });
@@ -762,7 +769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           broadcast(client.sessionId, {
             type: 'message.new',
-            data: { direction: "Incoming", messageType: "G", rawFix, parsed: fixTags, fromRole: client.role }
+            data: { direction: "Incoming", messageType: "G", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: client.role }
           });
         }
 
@@ -798,33 +805,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
             createdBy: client.role,
           });
 
-          const fixTags = {
-            "11": order.clOrdId,
-            "17": execId,
-            "150": "5",  // ExecType: Replaced
-            "39": "0",   // OrdStatus: New
-            "55": order.symbol,
-            "54": order.side === "Buy" ? "1" : "2",
-            "32": "0",
-            "31": (price || order.price || 0).toString(),
-            "151": (quantity - order.cumQty).toString(),
-            "14": order.cumQty.toString(),
-            "6": (order.avgPx || 0).toString(),
-            "38": quantity.toString(),
-          };
-
-          if (price !== undefined) {
-            fixTags["44"] = price.toString();
-          }
-
-          const rawFix = tagsToFIXString("8", fixTags);
+          const fixMessage = fixEngine.buildExecutionReport({
+            orderId: order.id,
+            clOrdId: order.clOrdId,
+            execId,
+            execType: "Replaced",
+            orderStatus: "New",
+            symbol: order.symbol,
+            side: order.side,
+            lastQty: 0,
+            lastPx: price || order.price || 0,
+            cumQty: order.cumQty,
+            avgPx: order.avgPx || 0,
+            leavesQty: quantity - order.cumQty,
+          });
 
           await storage.createMessage({
             sessionId: client.sessionId,
             direction: "Outgoing",
             messageType: "8",
-            rawFix,
-            parsed: fixTags,
+            rawFix: fixMessage.rawFix,
+            parsed: fixMessage.tags,
             fromRole: client.role,
             toRole: "Trader",
           });
@@ -841,7 +842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           broadcast(client.sessionId, {
             type: 'message.new',
-            data: { direction: "Incoming", messageType: "8", rawFix, parsed: fixTags, fromRole: client.role }
+            data: { direction: "Incoming", messageType: "8", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: client.role }
           });
         }
 
@@ -873,7 +874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           // Create FIX message
-          const fixTags = {
+          const fixMessage = fixEngine.buildGenericMessage("J", {
             "70": allocId,
             "71": "0",
             "78": calculation.accounts.length.toString(),
@@ -881,16 +882,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             "54": order.side === "Buy" ? "1" : "2",
             "6": (order.avgPx || 0).toString(),
             "75": new Date().toISOString().split('T')[0],
-          };
-
-          const rawFix = tagsToFIXString("J", fixTags);
+          });
 
           await storage.createMessage({
             sessionId: client.sessionId,
             direction: "Outgoing",
             messageType: "J",
-            rawFix,
-            parsed: fixTags,
+            rawFix: fixMessage.rawFix,
+            parsed: fixMessage.tags,
             fromRole: client.role,
             toRole: "Broker",
           });
@@ -902,7 +901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           broadcast(client.sessionId, {
             type: 'message.new',
-            data: { direction: "Incoming", messageType: "J", rawFix, parsed: fixTags, fromRole: client.role }
+            data: { direction: "Incoming", messageType: "J", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: client.role }
           });
         }
 
@@ -915,20 +914,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const allocation = await storage.getAllocation(allocId);
           if (allocation) {
-            const fixTags = {
+            const fixMessage = fixEngine.buildGenericMessage("AS", {
               "755": `REPT-${Date.now()}`,
               "87": accept ? "0" : "1",
               "6": allocation.avgPx.toString(),
-            };
-
-            const rawFix = tagsToFIXString("AS", fixTags);
+            });
 
             await storage.createMessage({
               sessionId: client.sessionId,
               direction: "Outgoing",
               messageType: "AS",
-              rawFix,
-              parsed: fixTags,
+              rawFix: fixMessage.rawFix,
+              parsed: fixMessage.tags,
               fromRole: client.role,
               toRole: "Trader",
             });
@@ -940,7 +937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             broadcast(client.sessionId, {
               type: 'message.new',
-              data: { direction: "Incoming", messageType: "AS", rawFix, parsed: fixTags, fromRole: client.role }
+              data: { direction: "Incoming", messageType: "AS", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: client.role }
             });
           }
         }
@@ -953,21 +950,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           const allocation = await storage.getAllocation(allocId);
           if (allocation) {
-            const fixTags = {
+            const fixMessage = fixEngine.buildGenericMessage("AK", {
               "664": `CONF-${Date.now()}`,
               "666": "0",
               "773": "1",
               "665": "1",
-            };
-
-            const rawFix = tagsToFIXString("AK", fixTags);
+            });
 
             await storage.createMessage({
               sessionId: client.sessionId,
               direction: "Outgoing",
               messageType: "AK",
-              rawFix,
-              parsed: fixTags,
+              rawFix: fixMessage.rawFix,
+              parsed: fixMessage.tags,
               fromRole: client.role,
               toRole: "Broker",
             });
@@ -979,7 +974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             broadcast(client.sessionId, {
               type: 'message.new',
-              data: { direction: "Incoming", messageType: "AK", rawFix, parsed: fixTags, fromRole: client.role }
+              data: { direction: "Incoming", messageType: "AK", rawFix: fixMessage.rawFix, parsed: fixMessage.tags, fromRole: client.role }
             });
           }
         }

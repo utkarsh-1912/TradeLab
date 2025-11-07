@@ -1,12 +1,16 @@
-import type { AssetClass, FIXMessageType, OrderSide, OrderType, Order } from "@shared/schema";
+import type { AssetClass, FIXMessageType, OrderSide, OrderType, Order, MessageDirection, ParticipantRole, FIXMessage as FIXDatabaseMessage } from "@shared/schema";
 
 // FIX 4.4 Standard Header Tags
 const SOH = "\x01";  // Start of Header delimiter
 const BEGIN_STRING = "FIX.4.4";
 
-export interface FIXMessage {
+// Tag map with index signature for dynamic access
+export type TagMap = Record<string, string | number | undefined>;
+
+// Transport-level FIX message (in-memory, wire-format)
+export interface FIXTransportMessage {
   msgType: FIXMessageType;
-  tags: Record<string, string | number>;
+  tags: TagMap;
   rawFix: string;
 }
 
@@ -53,7 +57,7 @@ export class FixEngineAdapter {
   /**
    * Generate FIX NewOrderSingle (MsgType=D) message
    */
-  buildNewOrderSingle(params: NewOrderSingleParams): FIXMessage {
+  buildNewOrderSingle(params: NewOrderSingleParams): FIXTransportMessage {
     const tags: Record<string, string | number> = {
       11: params.clOrdId,           // ClOrdID
       55: params.symbol,            // Symbol
@@ -96,7 +100,7 @@ export class FixEngineAdapter {
   /**
    * Generate FIX ExecutionReport (MsgType=8) message
    */
-  buildExecutionReport(params: ExecutionReportParams): FIXMessage {
+  buildExecutionReport(params: ExecutionReportParams): FIXTransportMessage {
     const tags: Record<string, string | number> = {
       37: params.orderId,           // OrderID
       11: params.clOrdId,           // ClOrdID
@@ -117,9 +121,17 @@ export class FixEngineAdapter {
   }
 
   /**
+   * Generic message builder for any FIX message type
+   * Use this for message types that don't have dedicated builders
+   */
+  buildGenericMessage(msgType: FIXMessageType, tags: Record<string, string | number>): FIXTransportMessage {
+    return this.createMessage(msgType, tags);
+  }
+
+  /**
    * Parse FIX message string into structured format
    */
-  parseMessage(rawFix: string): FIXMessage {
+  parseMessage(rawFix: string): FIXTransportMessage {
     const tags: Record<string, string | number> = {};
     const pairs = rawFix.split(SOH).filter(Boolean);
 
@@ -149,7 +161,7 @@ export class FixEngineAdapter {
   /**
    * Validate FIX message structure
    */
-  validateMessage(message: FIXMessage): { valid: boolean; errors: string[] } {
+  validateMessage(message: FIXTransportMessage): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     // Check required header fields
@@ -184,7 +196,7 @@ export class FixEngineAdapter {
   /**
    * Create a properly formatted FIX message with header and checksum
    */
-  private createMessage(msgType: FIXMessageType, tags: Record<string, string | number>): FIXMessage {
+  private createMessage(msgType: FIXMessageType, tags: Record<string, string | number>): FIXTransportMessage {
     // Build body
     let body = `35=${msgType}${SOH}`;
     
@@ -206,7 +218,7 @@ export class FixEngineAdapter {
 
     return {
       msgType,
-      tags: { ...tags, 8: BEGIN_STRING, 9: bodyLength, 10: checksum },
+      tags: { 35: msgType, ...tags, 8: BEGIN_STRING, 9: bodyLength, 10: checksum },
       rawFix: message,
     };
   }
@@ -269,6 +281,61 @@ export class FixEngineAdapter {
    */
   fromDisplayString(displayString: string): string {
     return displayString.replace(/\|/g, SOH);
+  }
+
+  /**
+   * Helper: Get tag value as string
+   */
+  getTagString(tags: TagMap, tag: string): string | undefined {
+    const value = tags[tag];
+    return value !== undefined ? String(value) : undefined;
+  }
+
+  /**
+   * Helper: Get tag value as number
+   */
+  getTagNumber(tags: TagMap, tag: string): number | undefined {
+    const value = tags[tag];
+    return value !== undefined ? Number(value) : undefined;
+  }
+
+  /**
+   * Helper: Check if tag exists
+   */
+  hasTag(tags: TagMap, tag: string): boolean {
+    return tags[tag] !== undefined;
+  }
+
+  /**
+   * Convert FIXTransportMessage to database record (for persistence)
+   */
+  toMessageRecord(
+    message: FIXTransportMessage,
+    sessionId: string,
+    direction: MessageDirection,
+    fromRole: ParticipantRole,
+    toRole: ParticipantRole | null
+  ): Omit<FIXDatabaseMessage, 'id' | 'timestamp'> {
+    return {
+      sessionId,
+      direction,
+      messageType: message.msgType,
+      rawFix: message.rawFix,
+      parsed: message.tags,  // parsed is Record<string, any>, not JSON string
+      fromRole,
+      toRole: toRole || undefined,  // Convert null to undefined
+    };
+  }
+
+  /**
+   * Convert database record to FIXTransportMessage
+   */
+  fromMessageRecord(record: FIXDatabaseMessage): FIXTransportMessage {
+    return {
+      msgType: record.messageType,
+      tags: record.parsed,  // parsed is already a Record<string, any>
+      rawFix: record.rawFix,
+    };
   }
 }
 
