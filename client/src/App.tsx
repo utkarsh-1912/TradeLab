@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "@/pages/landing";
 import TraderDashboard from "@/pages/trader-dashboard";
 import BrokerDashboard from "@/pages/broker-dashboard";
+import BrokerOrdersPage from "@/pages/broker-orders-page";
 import CustodianDashboard from "@/pages/custodian-dashboard";
 import MessageLogsPage from "@/pages/message-logs-page";
 import ExecutionsPage from "@/pages/executions-page";
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/" component={Landing} />
       <Route path="/trader" component={TraderDashboard} />
       <Route path="/broker" component={BrokerDashboard} />
+      <Route path="/broker-orders" component={BrokerOrdersPage} />
       <Route path="/custodian" component={CustodianDashboard} />
       <Route path="/messages" component={MessageLogsPage} />
       <Route path="/executions" component={ExecutionsPage} />
