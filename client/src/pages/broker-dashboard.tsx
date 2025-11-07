@@ -5,10 +5,12 @@ import { useToast } from "@/hooks/use-toast";
 import { ConnectionStatus } from "@/components/connection-status";
 import { SessionControlBar } from "@/components/session-control-bar";
 import { OrderBook } from "@/components/order-book";
+import { OrderFillModal } from "@/components/order-fill-modal";
+import { OrderDetailsModal } from "@/components/order-details-modal";
 import { ExportImport } from "@/components/export-import";
 import { LogOut, Check, MessageSquare, TrendingUp } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
-import type { Order, Execution } from "@shared/schema";
+import type { Order, Execution, FIXMessage } from "@shared/schema";
 
 export default function BrokerDashboard() {
   const [, setLocation] = useLocation();
@@ -17,6 +19,11 @@ export default function BrokerDashboard() {
   const [latencyMs, setLatencyMs] = useState(0);
   const [simulateReject, setSimulateReject] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [executions, setExecutions] = useState<Execution[]>([]);
+  const [messages, setMessages] = useState<FIXMessage[]>([]);
+  const [fillModalOpen, setFillModalOpen] = useState(false);
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
   const username = localStorage.getItem("fixlab_username") || "Broker";
   const sessionId = localStorage.getItem("fixlab_session_id") || "";
@@ -32,26 +39,41 @@ export default function BrokerDashboard() {
     wsClient.connect(sessionId, "Broker", username, sessionName);
 
     // Set up event handlers
-    wsClient.on("session.joined", (data) => {
+    const handleSessionJoined = (data: any) => {
       setConnected(true);
       setOrders(data.orders || []);
+      setExecutions(data.executions || []);
+      setMessages(data.messages || []);
       toast({
         title: "Connected",
         description: "Successfully joined session",
       });
-    });
+    };
 
-    wsClient.on("order.created", (order: Order) => {
+    const handleOrderCreated = (order: Order) => {
       setOrders((prev) => [...prev, order]);
-    });
+    };
 
-    wsClient.on("order.updated", (updatedOrder: Order) => {
+    const handleOrderUpdated = (updatedOrder: Order) => {
       setOrders((prev) =>
         prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
       );
-    });
+    };
 
-    wsClient.on("execution.created", (execution: Execution) => {
+    const handleOrderCancelPending = (updatedOrder: Order) => {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
+      );
+    };
+
+    const handleOrderReplacePending = (data: any) => {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === data.order.id ? data.order : o))
+      );
+    };
+
+    const handleExecutionCreated = (execution: Execution) => {
+      setExecutions((prev) => [...prev, execution]);
       setOrders((prev) =>
         prev.map((o) =>
           o.id === execution.orderId
@@ -65,17 +87,49 @@ export default function BrokerDashboard() {
             : o
         )
       );
-    });
+    };
 
-    wsClient.on("error", (error) => {
+    const handleMessageNew = (msgData: any) => {
+      const message: FIXMessage = {
+        id: `msg-${Date.now()}-${Math.random()}`,
+        sessionId: sessionName,
+        direction: msgData.direction,
+        messageType: msgData.messageType,
+        rawFix: msgData.rawFix,
+        parsed: msgData.parsed,
+        timestamp: Date.now(),
+        fromRole: msgData.fromRole,
+        toRole: msgData.toRole,
+      };
+      setMessages((prev) => [message, ...prev]);
+    };
+
+    const handleError = (error: any) => {
       toast({
         title: "Error",
         description: error.message || "An error occurred",
         variant: "destructive",
       });
-    });
+    };
+
+    wsClient.on("session.joined", handleSessionJoined);
+    wsClient.on("order.created", handleOrderCreated);
+    wsClient.on("order.updated", handleOrderUpdated);
+    wsClient.on("order.cancel.pending", handleOrderCancelPending);
+    wsClient.on("order.replace.pending", handleOrderReplacePending);
+    wsClient.on("execution.created", handleExecutionCreated);
+    wsClient.on("message.new", handleMessageNew);
+    wsClient.on("error", handleError);
 
     return () => {
+      wsClient.off("session.joined", handleSessionJoined);
+      wsClient.off("order.created", handleOrderCreated);
+      wsClient.off("order.updated", handleOrderUpdated);
+      wsClient.off("order.cancel.pending", handleOrderCancelPending);
+      wsClient.off("order.replace.pending", handleOrderReplacePending);
+      wsClient.off("execution.created", handleExecutionCreated);
+      wsClient.off("message.new", handleMessageNew);
+      wsClient.off("error", handleError);
       wsClient.disconnect();
     };
   }, [sessionName, username, setLocation, toast]);
@@ -97,6 +151,40 @@ export default function BrokerDashboard() {
   const handleRejectChange = (enabled: boolean) => {
     setSimulateReject(enabled);
     wsClient.updateRejectSimulation(enabled);
+  };
+
+  const handleOpenFillModal = (order: Order) => {
+    setSelectedOrder(order);
+    setFillModalOpen(true);
+  };
+
+  const handleOpenDetailsModal = (order: Order) => {
+    setSelectedOrder(order);
+    setDetailsModalOpen(true);
+  };
+
+  const handleFillOrder = (orderId: string, quantity: number, price: number) => {
+    wsClient.send({
+      type: "order.fill",
+      data: { orderId, quantity, price },
+    });
+    
+    toast({
+      title: "Order Filled",
+      description: `Filled ${quantity} @ $${price.toFixed(2)}`,
+    });
+  };
+
+  const handleRejectOrder = (orderId: string) => {
+    wsClient.send({
+      type: "order.reject",
+      data: { orderId },
+    });
+
+    toast({
+      title: "Order Rejected",
+      description: "Order has been rejected",
+    });
   };
 
   return (
@@ -159,8 +247,30 @@ export default function BrokerDashboard() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden p-4">
-        <OrderBook orders={orders} showActions={false} />
+        <OrderBook 
+          orders={orders} 
+          showActions={true}
+          onOrderClick={handleOpenDetailsModal}
+          onFillOrder={handleOpenFillModal}
+        />
       </div>
+
+      {/* Modals */}
+      <OrderFillModal
+        open={fillModalOpen}
+        onClose={() => setFillModalOpen(false)}
+        order={selectedOrder}
+        onFill={handleFillOrder}
+        onReject={handleRejectOrder}
+      />
+
+      <OrderDetailsModal
+        open={detailsModalOpen}
+        onClose={() => setDetailsModalOpen(false)}
+        order={selectedOrder}
+        executions={executions}
+        messages={messages}
+      />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, RefreshCw } from "lucide-react";
+import { X, RefreshCw, Check, Eye } from "lucide-react";
 import type { Order } from "@shared/schema";
 
 interface OrderBookProps {
@@ -11,10 +11,11 @@ interface OrderBookProps {
   onCancel?: (orderId: string) => void;
   onReplace?: (orderId: string) => void;
   onOrderClick?: (order: Order) => void;
+  onFillOrder?: (order: Order) => void;
   showActions?: boolean;
 }
 
-export function OrderBook({ orders, onCancel, onReplace, onOrderClick, showActions = true }: OrderBookProps) {
+export function OrderBook({ orders, onCancel, onReplace, onOrderClick, onFillOrder, showActions = true }: OrderBookProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "New":
@@ -75,7 +76,7 @@ export function OrderBook({ orders, onCancel, onReplace, onOrderClick, showActio
                   <TableHead className="font-semibold text-xs">Type</TableHead>
                   <TableHead className="font-semibold text-xs">Status</TableHead>
                   <TableHead className="font-semibold text-xs text-right">Filled</TableHead>
-                  {showActions && <TableHead className="font-semibold text-xs">Actions</TableHead>}
+                  {showActions && <TableHead className="font-semibold text-xs text-center">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -111,8 +112,26 @@ export function OrderBook({ orders, onCancel, onReplace, onOrderClick, showActio
                   </TableCell>
                   {showActions && (
                     <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1">
-                        {order.status !== "Filled" && order.status !== "Canceled" && order.status !== "Rejected" && (
+                      <div className="flex items-center justify-center gap-1">
+                        {/* Broker Actions (Fill/View) */}
+                        {onFillOrder && order.status !== "Filled" && order.status !== "Canceled" && order.status !== "Rejected" && (
+                          <Button
+                            data-testid={`button-fill-${order.id}`}
+                            size="sm"
+                            variant="default"
+                            className="h-7 text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onFillOrder(order);
+                            }}
+                          >
+                            <Check className="h-3 w-3 mr-1" />
+                            Fill
+                          </Button>
+                        )}
+                        
+                        {/* Trader Actions (Cancel/Replace) */}
+                        {!onFillOrder && order.status !== "Filled" && order.status !== "Canceled" && order.status !== "Rejected" && (
                           <>
                             {onReplace && (
                               <Button
