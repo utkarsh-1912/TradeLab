@@ -9,10 +9,11 @@ interface OrderBookProps {
   orders: Order[];
   onCancel?: (orderId: string) => void;
   onReplace?: (orderId: string) => void;
+  onOrderClick?: (order: Order) => void;
   showActions?: boolean;
 }
 
-export function OrderBook({ orders, onCancel, onReplace, showActions = true }: OrderBookProps) {
+export function OrderBook({ orders, onCancel, onReplace, onOrderClick, showActions = true }: OrderBookProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "New":
@@ -79,7 +80,8 @@ export function OrderBook({ orders, onCancel, onReplace, showActions = true }: O
               {orders.map((order) => (
                 <TableRow
                   key={order.id}
-                  className="hover-elevate"
+                  className="hover-elevate cursor-pointer"
+                  onClick={() => onOrderClick?.(order)}
                   data-testid={`row-order-${order.id}`}
                 >
                   <TableCell className="font-mono text-xs">{order.clOrdId}</TableCell>
@@ -106,7 +108,7 @@ export function OrderBook({ orders, onCancel, onReplace, showActions = true }: O
                     {order.cumQty}/{order.quantity}
                   </TableCell>
                   {showActions && (
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         {order.status !== "Filled" && order.status !== "Canceled" && order.status !== "Rejected" && (
                           <>
@@ -116,7 +118,10 @@ export function OrderBook({ orders, onCancel, onReplace, showActions = true }: O
                                 size="icon"
                                 variant="ghost"
                                 className="h-7 w-7"
-                                onClick={() => onReplace(order.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onReplace(order.id);
+                                }}
                               >
                                 <RefreshCw className="h-3.5 w-3.5" />
                               </Button>
@@ -127,7 +132,10 @@ export function OrderBook({ orders, onCancel, onReplace, showActions = true }: O
                                 size="icon"
                                 variant="ghost"
                                 className="h-7 w-7"
-                                onClick={() => onCancel(order.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onCancel(order.id);
+                                }}
                               >
                                 <X className="h-3.5 w-3.5" />
                               </Button>
