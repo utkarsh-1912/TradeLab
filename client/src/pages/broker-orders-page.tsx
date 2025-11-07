@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { OrderFillModal } from "@/components/order-fill-modal";
 import { OrderDetailsModal } from "@/components/order-details-modal";
-import { ArrowLeft, LogOut, Eye } from "lucide-react";
+import { ArrowLeft, LogOut, Eye, Check } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import type { Order, Allocation, Execution, FIXMessage } from "@shared/schema";
 
@@ -157,10 +157,8 @@ export default function BrokerOrdersPage() {
   };
 
   const handleFillOrder = (orderId: string, quantity: number, price: number) => {
-    wsClient.send({
-      type: "order.fill",
-      data: { orderId, quantity, price },
-    });
+    wsClient.sendFillOrder({ orderId, fillQty: quantity, fillPx: price });
+    setFillModalOpen(false);
     
     toast({
       title: "Order Filled",
@@ -169,10 +167,9 @@ export default function BrokerOrdersPage() {
   };
 
   const handleRejectOrder = (orderId: string) => {
-    wsClient.send({
-      type: "order.reject",
-      data: { orderId },
-    });
+    wsClient.sendRejectOrder({ orderId });
+    setFillModalOpen(false);
+    
     toast({
       title: "Order Rejected",
       description: `Order ${orderId}`,

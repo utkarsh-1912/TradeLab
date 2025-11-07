@@ -164,10 +164,8 @@ export default function BrokerDashboard() {
   };
 
   const handleFillOrder = (orderId: string, quantity: number, price: number) => {
-    wsClient.send({
-      type: "order.fill",
-      data: { orderId, quantity, price },
-    });
+    wsClient.sendFillOrder({ orderId, fillQty: quantity, fillPx: price });
+    setFillModalOpen(false);
     
     toast({
       title: "Order Filled",
@@ -176,10 +174,8 @@ export default function BrokerDashboard() {
   };
 
   const handleRejectOrder = (orderId: string) => {
-    wsClient.send({
-      type: "order.reject",
-      data: { orderId },
-    });
+    wsClient.sendRejectOrder({ orderId });
+    setFillModalOpen(false);
 
     toast({
       title: "Order Rejected",
