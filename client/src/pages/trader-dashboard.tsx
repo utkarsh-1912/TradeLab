@@ -124,7 +124,8 @@ export default function TraderDashboard() {
     wsClient.disconnect();
     localStorage.removeItem("fixlab_username");
     localStorage.removeItem("fixlab_role");
-    localStorage.removeItem("fixlab_session");
+    localStorage.removeItem("fixlab_session_id");
+    localStorage.removeItem("fixlab_session_name");
     setLocation("/");
   };
 

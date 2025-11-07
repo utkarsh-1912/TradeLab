@@ -42,6 +42,15 @@ const orderFormSchema = z.object({
   couponRate: z.number().min(0).max(100).optional(),
   maturityDate: z.string().optional(),
   accruedInterest: z.number().optional(),
+}).refine((data) => {
+  // Require price for Limit, Stop, and StopLimit orders
+  if (data.orderType === "Limit" || data.orderType === "Stop" || data.orderType === "StopLimit") {
+    return data.price !== undefined && data.price > 0;
+  }
+  return true;
+}, {
+  message: "Price is required for Limit, Stop, and StopLimit orders",
+  path: ["price"],
 });
 
 type OrderFormData = z.infer<typeof orderFormSchema>;

@@ -13,6 +13,8 @@ export type WSEventType =
   | "session.joined"
   | "order.created"
   | "order.updated"
+  | "order.cancel.pending"
+  | "order.replace.pending"
   | "execution.created"
   | "allocation.created"
   | "allocation.updated"

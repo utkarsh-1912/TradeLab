@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +9,7 @@ import { ConnectionStatus } from "@/components/connection-status";
 import { SessionControlBar } from "@/components/session-control-bar";
 import { MessageTimeline } from "@/components/message-timeline";
 import { ExportImport } from "@/components/export-import";
-import { LogOut, Check, X } from "lucide-react";
+import { LogOut, Check, X, MessageSquare, TrendingUp } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import type { Allocation, FIXMessage } from "@shared/schema";
 
@@ -94,7 +94,8 @@ export default function CustodianDashboard() {
     wsClient.disconnect();
     localStorage.removeItem("fixlab_username");
     localStorage.removeItem("fixlab_role");
-    localStorage.removeItem("fixlab_session");
+    localStorage.removeItem("fixlab_session_id");
+    localStorage.removeItem("fixlab_session_name");
     setLocation("/");
   };
 
@@ -134,7 +135,19 @@ export default function CustodianDashboard() {
           <div className="h-6 w-px bg-border" />
           <h2 className="text-base font-semibold text-muted-foreground">Custodian Dashboard</h2>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <Link href="/messages">
+            <Button variant="outline" size="sm" data-testid="button-view-messages">
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Messages
+            </Button>
+          </Link>
+          <Link href="/executions">
+            <Button variant="outline" size="sm" data-testid="button-view-executions">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Executions
+            </Button>
+          </Link>
           <ConnectionStatus connected={connected} role={username} />
           <ExportImport 
             sessionId={sessionId} 
