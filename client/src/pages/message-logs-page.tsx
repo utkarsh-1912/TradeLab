@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LogOut, Download, Search, Filter } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { LogOut, Download, Search, Filter, ArrowLeft } from "lucide-react";
 import { wsClient } from "@/lib/wsClient";
 import { useToast } from "@/hooks/use-toast";
 import type { FIXMessage } from "@shared/schema";
@@ -78,6 +79,15 @@ export default function MessageLogsPage() {
     localStorage.removeItem("fixlab_role");
     wsClient.disconnect();
     setLocation("/");
+  };
+
+  const handleBackToDashboard = () => {
+    const dashboardRoutes = {
+      Trader: "/trader",
+      Broker: "/broker",
+      Custodian: "/custodian",
+    };
+    setLocation(dashboardRoutes[role]);
   };
 
   const handleExport = () => {
