@@ -1,8 +1,8 @@
-# FixLab - FIX Protocol Simulator
+# TradeLab - FIX Protocol Simulator
 
 ## Overview
 
-FixLab is a browser-based integrated FIX protocol simulator that replicates financial trading workflows across three roles: Trader, Broker, and Custodian. The application enables multi-participant simulation of complete order-to-allocation workflows using WebSocket-based real-time communication. Users can open multiple browser tabs, each assuming different roles within a shared trading session, to simulate realistic financial message exchanges including order placement, execution reporting, and post-trade allocation processing.
+TradeLab is a browser-based integrated FIX protocol simulator that replicates financial trading workflows across three roles: Trader, Broker, and Custodian. The application enables multi-participant simulation of complete order-to-allocation workflows using WebSocket-based real-time communication. Users can open multiple browser tabs, each assuming different roles within a shared trading session, to simulate realistic financial message exchanges including order placement, execution reporting, and post-trade allocation processing.
 
 ## Recent Changes
 
