@@ -158,30 +158,37 @@ export function OrderEntryModal({ onSubmit, disabled }: OrderEntryModalProps) {
                 name="symbol"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
-                      {watchAssetClass === "FX" ? "Currency Pair" : "Symbol"}
-                    </FormLabel>
-                    <FormControl>
-                      {watchAssetClass === "Equity" ? (
+                    {watchAssetClass === "Equity" ? (
+                      <FormControl>
                         <SymbolSearch
                           data-testid="input-symbol"
                           value={field.value || ""}
                           onSelect={(symbol) => field.onChange(symbol)}
                           placeholder="Search symbol..."
+                          label="Symbol"
                         />
-                      ) : (
-                        <Input
-                          data-testid="input-symbol"
-                          {...field}
-                          placeholder={
-                            watchAssetClass === "FX" ? "e.g., EUR/USD" :
-                            watchAssetClass === "Futures" ? "e.g., ESZ4" :
-                            watchAssetClass === "Options" ? "e.g., AAPL" :
-                            "e.g., US10Y"
-                          }
-                        />
-                      )}
-                    </FormControl>
+                      </FormControl>
+                    ) : (
+                      <>
+                        <FormLabel>
+                          {watchAssetClass === "FX" ? "Currency Pair" : 
+                           watchAssetClass === "Options" ? "Option Symbol" : 
+                           "Symbol"}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            data-testid="input-symbol"
+                            {...field}
+                            placeholder={
+                              watchAssetClass === "FX" ? "e.g., EUR/USD" :
+                              watchAssetClass === "Futures" ? "e.g., ESZ4" :
+                              watchAssetClass === "Options" ? "e.g., AAPL250120C00150000" :
+                              "e.g., US10Y"
+                            }
+                          />
+                        </FormControl>
+                      </>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
