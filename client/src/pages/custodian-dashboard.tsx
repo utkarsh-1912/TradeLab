@@ -131,7 +131,7 @@ export default function CustodianDashboard() {
       {/* Header */}
       <header className="h-16 border-b bg-card/50 px-6 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold">FixLab</h1>
+          <img src="/favicon.png" alt="FixLab Logo" className="h-8 w-8" />
           <div className="h-6 w-px bg-border" />
           <h2 className="text-base font-semibold text-muted-foreground">Custodian Dashboard</h2>
         </div>

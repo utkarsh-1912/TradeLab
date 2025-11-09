@@ -92,7 +92,7 @@ export default function Landing() {
       <header className="w-full py-4 bg-white shadow-sm flex items-center justify-between px-6">
         <div className="flex items-center gap-2">
           <img src="/favicon.png" alt="FixLab Logo" className="h-8 w-8" />
-          <span className="font-bold text-xl tracking-tight">FixLab</span>
+          <span className="font-bold text-xl tracking-tight">TradeLab</span>
         </div>
       </header>
 
@@ -102,7 +102,7 @@ export default function Landing() {
           <CardHeader className="text-center space-y-2">
             <CardTitle className="text-2xl font-bold">FIX Protocol Simulator</CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
-              Browser-based integrated FIX simulator with complete allocation workflows
+              Browser-based integrated FIX simulator for trading with complete allocation workflows
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
