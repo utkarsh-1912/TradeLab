@@ -17,7 +17,7 @@ export default function ExecutionsPage() {
   const { toast } = useToast();
   const [connected, setConnected] = useState(false);
   const [executions, setExecutions] = useState<Execution[]>([]);
-  const [filterSymbol, setFilterSymbol] = useState("");
+  const [filterSymbol, setFilterSymbol] = useState("all");
   const [filterSide, setFilterSide] = useState("all");
   const [searchText, setSearchText] = useState("");
 
@@ -133,7 +133,7 @@ export default function ExecutionsPage() {
   };
 
   const filteredExecutions = executions.filter(exec => {
-    if (filterSymbol && exec.symbol !== filterSymbol) return false;
+    if (filterSymbol !== "all" && exec.symbol !== filterSymbol) return false;
     if (filterSide !== "all" && exec.side !== filterSide) return false;
     if (searchText && !exec.execId.toLowerCase().includes(searchText.toLowerCase())) return false;
     return true;
@@ -227,7 +227,7 @@ export default function ExecutionsPage() {
                     <SelectValue placeholder="All Symbols" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Symbols</SelectItem>
+                    <SelectItem value="all">All Symbols</SelectItem>
                     {uniqueSymbols.map(symbol => (
                       <SelectItem key={symbol} value={symbol}>{symbol}</SelectItem>
                     ))}
