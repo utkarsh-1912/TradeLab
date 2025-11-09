@@ -100,7 +100,7 @@ export default function Landing() {
       <main className="flex-1 flex items-center justify-center p-4">
         <Card className="w-full max-w-2xl shadow-lg border-0 rounded-xl">
           <CardHeader className="text-center space-y-2">
-            <CardTitle className="text-2xl font-bold">FIX Protocol Simulator</CardTitle>
+            <CardTitle className="text-2xl font-bold">Trade Simulator</CardTitle>
             <CardDescription className="text-sm text-muted-foreground">
               Browser-based integrated FIX simulator for trading with complete allocation workflows
             </CardDescription>
@@ -203,7 +203,7 @@ export default function Landing() {
       <footer className="w-full py-4 bg-white shadow-inner text-center text-sm text-muted-foreground">
         <div className="flex items-center justify-center gap-2">
           <img src="/favicon.png" alt="FixLab Logo" className="h-5 w-5" />
-          <span>FixLab © {new Date().getFullYear()}</span>
+          <span>TradeLab © {new Date().getFullYear()}</span>
         </div>
       </footer>
     </div>
